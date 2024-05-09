@@ -1,13 +1,22 @@
 import wx
+from ClasesFunciones import *
 
+#Definicion de funciones/clases extra
+
+class Ventana(wx.Frame):
+    def __init__(self):
+        super(Ventana, self).__init__(None, title="BlackJack", size=(1080,720))
+        self.Show(True)
+
+
+
+#Definimos el main para ejecutar la aplicacion
 def main():
     app = wx.App()
-    # widget padre es None. title y size son personalizados
-    ven= wx.Frame(None, title='BlackJack', size=(1024,720))
-    ven.Show() # Obligatorio mostrar siempre la ventana
-    app.MainLoop()  #La ventana no se cierre al instante
+    ventana = Ventana()
+    ventana.Show()
+    app.MainLoop()
     return None
 
 main()
-
 
