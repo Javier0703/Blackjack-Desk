@@ -48,21 +48,29 @@ class LateralEstatico(wx.Panel):
         menu_info = wx.BoxSizer(wx.VERTICAL)
 
         #Partidas
+        font = wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
         fieldset_partidas = wx.StaticBox(self, label="Partidas")
         sizer_partidas = wx.StaticBoxSizer(fieldset_partidas, wx.VERTICAL)
         self.texto_partidas = wx.StaticText(self, label="0")
+        self.texto_partidas.SetFont(font)
         sizer_partidas.Add(self.texto_partidas, 0, wx.ALIGN_CENTER)
+
         fieldset_balance = wx.StaticBox(self, label="Balance Global")
         slizer_balance = wx.StaticBoxSizer(fieldset_balance, wx.VERTICAL)
         self.texto_balance = wx.StaticText(self, label="1")
+        self.texto_balance.SetFont(font)
         slizer_balance.Add(self.texto_balance, 0, wx.ALIGN_CENTER)
+
         fieldset_bal_partida = wx.StaticBox(self, label="Balance Partida Actual")
         slizer_bal_partida = wx.StaticBoxSizer(fieldset_bal_partida, wx.VERTICAL)
         self.texto_bal_partida = wx.StaticText(self, label="2")
+        self.texto_bal_partida.SetFont(font)
         slizer_bal_partida.Add(self.texto_bal_partida, 0, wx.ALIGN_CENTER)
+
         fieldset_cuenta_atras = wx.StaticBox(self, label="Cuenta Atras")
         slizer_cuenta_atras = wx.StaticBoxSizer(fieldset_cuenta_atras, wx.VERTICAL)
         self.texto_cuenta_atras = wx.StaticText(self, label="3")
+        self.texto_cuenta_atras.SetFont(font)
         slizer_cuenta_atras.Add(self.texto_cuenta_atras, 0, wx.ALIGN_CENTER)
 
         menu_info.Add(sizer_partidas, 0, wx.TOP|wx.EXPAND, 5)
@@ -79,6 +87,21 @@ class LateralEstatico(wx.Panel):
 
         self.SetSizer(sizer_lat_estatic)
 
+    def cambiar_retardo(self, nuevo_valor):
+        self.input_retardo.SetValue(str(nuevo_valor))    
+
+# Menu Dinamico de mi Ventana
+class MenuJuego(wx.ScrolledWindow):
+    def __init__(self, parent):
+        super(MenuJuego, self).__init__(parent)
+
+        self.sizer_menu_juego = wx.BoxSizer(wx.VERTICAL)
+        self.SetSizer(self.sizer_menu_juego)
+
+        #Paneles donde van las cartas
+        wxPanels = []
+
+
 #Ventana princiapl (juego)
 class Ventana(wx.Frame):
     def __init__(self):
@@ -86,14 +109,15 @@ class Ventana(wx.Frame):
                 
         # Creamos el Panel Lateral (Estatico) y el Panel Derecho (Dinamico)
         panel_estatico = LateralEstatico(self)
-        
+        menu_juego = MenuJuego(self)
+
         # Creamos un sizer horizontal para organizar la ventana principal y el panel lateral
         sizer_ventana = wx.BoxSizer(wx.HORIZONTAL)
         sizer_ventana.Add(panel_estatico, 0, wx.EXPAND)
-        
+        sizer_ventana.Add(menu_juego, 0, wx.EXPAND)
+
         self.SetSizer(sizer_ventana)
         self.Show(True)
-
 
 def main():
     app = wx.App()
