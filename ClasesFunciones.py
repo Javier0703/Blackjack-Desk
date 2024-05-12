@@ -154,6 +154,24 @@ def volverJugar(game,gamesToPlay,balance):
         break
    return volver_jugar
 
+#Funciones para añadir una carta y generar las distintas manos
+def anyadirCartas(mano,numCartas):
+   for i in range(len(mano)):
+      for _ in range(numCartas):
+         mano[i].append(mazo.reparte())
+   return mano
+
+def createMano(mano,nombre,letter,centinela):
+   h = []
+   for element in mano:
+      if len(mano)>1:
+         tmpName = nombre+str(chr(ord(letter) + centinela))
+         centinela+=1
+         h.append(Mano(element,tmpName,apuesta))
+      else:   
+         h.append(Mano(element,nombre,apuesta))
+   return h
+
 #Main
 def main():
    #Modos de juego del BlackJack, inicializacion de variables: balance, tipos de apuesta...
@@ -209,13 +227,12 @@ def main():
          #Ya tenemos apuesta:
          print("\nREPARTO INICIAL")
          #Se le genera una(s) mano(s) tanto al Croupier como al jugador . Inicialmente son una para cada uno
-         #Funciones para añadir una carta y generar las distintas manos
          def anyadirCartas(mano,numCartas):
             for i in range(len(mano)):
                for _ in range(numCartas):
                   mano[i].append(mazo.reparte())
             return mano
-         
+
          def createMano(mano,nombre,letter,centinela):
             h = []
             for element in mano:
@@ -226,7 +243,7 @@ def main():
                else:   
                   h.append(Mano(element,nombre,apuesta))
             return h
-
+         
          #Croupier (Si hay mas de dos manos seran CroupierA, CroupierB...)
          nombre, letter = nombres[1], 'A'
          centinela = 0
