@@ -5,6 +5,7 @@
 #
 
 import wx
+import ClasesFunciones
 
 # begin wxGlade: dependencies
 # end wxGlade
@@ -12,6 +13,13 @@ import wx
 # begin wxGlade: extracode
 # end wxGlade
 
+def generar_cartas():
+    m = []
+    for i in range(52):
+        img = wx.Bitmap()
+        img.LoadFile(f"Imagenes//Cartas//{i}.png")
+        m.append(img)
+    return m
 
 class Ventana(wx.Frame):
     def __init__(self, *args, **kwds):
@@ -19,7 +27,7 @@ class Ventana(wx.Frame):
         kwds["style"] = kwds.get("style", 0) | wx.DEFAULT_FRAME_STYLE
         wx.Frame.__init__(self, *args, **kwds)
         self.SetSize((1296, 696))
-        self.SetTitle("frame")
+        self.SetTitle("BlackJack")
 
         sizer_general = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -103,17 +111,20 @@ class Ventana(wx.Frame):
         tiempo.SetFont(wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
         sizer_tiempo.Add(tiempo, 1, wx.ALL, 0)
 
+        #Panel dinamico (Manos)
+
         self.panel_dinamico = wx.ScrolledWindow(self, wx.ID_ANY, style=wx.TAB_TRAVERSAL)
         self.panel_dinamico.SetScrollRate(10, 10)
         sizer_general.Add(self.panel_dinamico, 1, wx.EXPAND, 0)
 
         sizer_manos_generales = wx.BoxSizer(wx.VERTICAL)
 
-        sizer_coupier = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_manos_generales.Add(sizer_coupier, 0, wx.EXPAND, 0)
+        #Aqui se generan los BoxSizer para las diferentes manos
+        self.sizer_croupier = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_manos_generales.Add(self.sizer_croupier, 0, wx.EXPAND, 0)
 
-        sizer_jugador = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_manos_generales.Add(sizer_jugador, 0, wx.EXPAND, 0)
+        self.sizer_jugador = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_manos_generales.Add(self.sizer_jugador, 0, wx.EXPAND, 0)
 
         self.panel_dinamico.SetSizer(sizer_manos_generales)
 
@@ -132,7 +143,26 @@ class BlackJack(wx.App):
         return True
 
 # end of class BlackJack
+def main():
+    app = BlackJack(0)
+    cartas = []
+    cartas = generar_cartas()
+
+    #Quiero crear un bitmap en la ventana
+    # Crear un bitmap con la primera carta de la lista de cartas
+    carta_bitmap = wx.StaticBitmap(app.frame.panel_dinamico, wx.ID_ANY, cartas[0])
+    carta_bitmap_2 = wx.StaticBitmap(app.frame.panel_dinamico, wx.ID_ANY, cartas[1])
+    carta_bitmap_3 = wx.StaticBitmap(app.frame.panel_dinamico, wx.ID_ANY, cartas[1])
+
+    # Agregar el bitmap al sizer correspondiente en la ventana (por ejemplo, sizer_croupier)
+    app.frame.sizer_croupier.Add(carta_bitmap, 0, wx.ALL, 5)
+    app.frame.sizer_croupier.Add(carta_bitmap_2, 0, wx.ALL, 5)
+    app.frame.sizer_jugador.Add(carta_bitmap_3, 0, wx.ALL, 5)
+
+    # Asegúrate de llamar a Layout() para que los cambios en el diseño se reflejen
+    app.frame.Layout()
+    app.MainLoop()
+
 
 if __name__ == "__main__":
-    app = BlackJack(0)
-    app.MainLoop()
+    main()

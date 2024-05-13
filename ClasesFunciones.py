@@ -103,7 +103,7 @@ class Mano():
       self.l4 = "╰───╯" * numCartas
 
    #Devuelve una lista con cad auna de las lineas de la carta (Son 4)
-   #Cartas Coupier
+   #Cartas croupier
    def imprimirCroupier(self):
       self.formaCarta()
       return [self.nombreTrans+self.l1 ,self.valorMano+self.l2,self.estadoPrint+self.l3,self.espaciado+self.l4]
@@ -326,8 +326,8 @@ def main():
                               break
 
                      elif r == 'A':
-                        #Utilizaremos el metodo de estrategia. Necesitamos el valor de la carta del Coupier y lista del jugador 
-                        """Metodo solo válido para una carta inicial del Coupier"""
+                        #Utilizaremos el metodo de estrategia. Necesitamos el valor de la carta del croupier y lista del jugador 
+                        """Metodo solo válido para una carta inicial del croupier"""
                         #Carta del Cropier y lista de cartas del Jugador
                         vc = Croupier[0][0]
                         vj = Jugador[i]
