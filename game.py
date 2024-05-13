@@ -5,14 +5,18 @@ import wx
 import ClasesFunciones
 
 #Creacion de Funciones/Clases/Variables generales
+reduccion = 0.25
+tipo_apuesta = [2,10,50]
+balance = 0
 
 #Funcion para generar las cartas (Bitmap)
 def generar_cartas():
     m = []
     for i in range(52):
-        img = wx.Bitmap()
-        img.LoadFile(f"Imagenes//Cartas//{i}.png")
-        m.append(img)
+        img = wx.Image(f"Imagenes//Cartas//{i}.png", wx.BITMAP_TYPE_ANY)
+        #Reducimos su anchura, ya que por defecto son muy grandes
+        img.Rescale(int(img.GetWidth() * reduccion), int(img.GetHeight() * reduccion))
+        m.append(wx.Bitmap(img))
     return m
 
 #Clase Ventana (Donde se encuentra la interfaz)
@@ -23,6 +27,9 @@ class Ventana(wx.Frame):
         wx.Frame.__init__(self, *args, **kwds)
         self.SetSize((1296, 696))
         self.SetTitle("BlackJack")
+
+        #Modo de juego
+        self.modo_juego = 'M'
 
         sizer_general = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -37,7 +44,7 @@ class Ventana(wx.Frame):
         self.boton_manual.SetValue(1)
         sizer_modo_juego.Add(self.boton_manual, 0, wx.RIGHT, 10)
 
-        self.boton_automatico = wx.RadioButton(self, wx.ID_ANY, "Automatico", style=wx.RB_GROUP)
+        self.boton_automatico = wx.RadioButton(self, wx.ID_ANY, "Automatico")
         sizer_modo_juego.Add(self.boton_automatico, 0, wx.LEFT, 10)
 
         sizer_retardo = wx.BoxSizer(wx.HORIZONTAL)
@@ -112,46 +119,57 @@ class Ventana(wx.Frame):
         self.panel_dinamico.SetScrollRate(10, 10)
         sizer_general.Add(self.panel_dinamico, 1, wx.EXPAND, 0)
 
-        sizer_manos_generales = wx.BoxSizer(wx.VERTICAL)
+        #Slizer para las manos generadas
+        self.sizer_manos_generales = wx.BoxSizer(wx.VERTICAL)
 
         #Aqui se generan los BoxSizer para las diferentes manos
-        #El metodo usado es generar una lista donde dentro se encuentren los BoxSizer
+        #Generamos el BoxSizer del Croupier
+        self.sizer_croupier = wx.BoxSizer(wx.HORIZONTAL)
+        self.sizer_manos_generales.Add(self.sizer_croupier, 0, wx.EXPAND, 0)
 
-        self.sizer_manos = []
+        #manos del Jugador
+        #El metodo es usar una lista con los paneles (manos) y los BoxSizer que es su contenido
+        self.slizer_paneles_jugador = []
+        self.slizer_boxsizers_jugador = []
 
-        #Generamos 2 al principio, para el Croupier y para el Jugador
-        self.sizer_manos.append(wx.BoxSizer(wx.HORIZONTAL))
-        sizer_manos_generales.Add(self.sizer_manos[0], 0, wx.EXPAND, 0)
-        self.sizer_manos.append(wx.BoxSizer(wx.HORIZONTAL))
-        sizer_manos_generales.Add(self.sizer_manos[1], 0, wx.EXPAND, 0)
-
-        self.panel_dinamico.SetSizer(sizer_manos_generales)
+        #Generame un Panel dentro de la lista anterior
+        self.panel_dinamico.SetSizer(self.sizer_manos_generales)
 
         self.SetSizer(sizer_general)
 
         self.Layout()
 
+        self.boton_manual.Bind(wx.EVT_RADIOBUTTON, self.cambiar_a_manual)
+        self.boton_automatico.Bind(wx.EVT_RADIOBUTTON, self.cambiar_a_automatico)
+
+    def cambiar_a_manual (self,event):
+        self.modo_juego = 'M'
+
+    def cambiar_a_automatico (self,event):
+        self.modo_juego = 'A'
+
 #Dialgo de Nueva Partida
 class NuevaPartida(wx.Dialog):
     def __init__(self, *args, **kwds):
-        # begin wxGlade: NuevaPartida.__init__
+
         kwds["style"] = kwds.get("style", 0) | wx.DEFAULT_DIALOG_STYLE
         wx.Dialog.__init__(self, *args, **kwds)
         self.SetTitle("dialog")
 
+        self.apuesta = 0
         sizer_dialogo = wx.BoxSizer(wx.VERTICAL)
 
         sizer_apuesta = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, "Apuesta"), wx.VERTICAL)
         sizer_dialogo.Add(sizer_apuesta, 0, wx.ALL | wx.EXPAND, 30)
 
-        self.apuesta_baja = wx.RadioButton(self, wx.ID_ANY, u"2 €", style=wx.RB_GROUP)
+        self.apuesta_baja = wx.RadioButton(self, wx.ID_ANY, f"{tipo_apuesta[0]} €", style=wx.RB_GROUP)
         self.apuesta_baja.SetValue(1)
         sizer_apuesta.Add(self.apuesta_baja, 0, wx.ALL, 3)
 
-        self.apuesta_media = wx.RadioButton(self, wx.ID_ANY, u"10 €")
+        self.apuesta_media = wx.RadioButton(self, wx.ID_ANY, f"{tipo_apuesta[1]} €")
         sizer_apuesta.Add(self.apuesta_media, 0, wx.ALL, 3)
 
-        self.apuesta_alta = wx.RadioButton(self, wx.ID_ANY, u"50 €")
+        self.apuesta_alta = wx.RadioButton(self, wx.ID_ANY, f"{tipo_apuesta[2]} €")
         sizer_apuesta.Add(self.apuesta_alta, 0, wx.ALL, 3)
 
         text_jugar = wx.StaticText(self, wx.ID_ANY, u"¿Quieres seguir jugando?", style=wx.ALIGN_CENTER_HORIZONTAL)
@@ -173,6 +191,23 @@ class NuevaPartida(wx.Dialog):
         sizer_dialogo.Fit(self)
 
         self.Layout()
+
+        self.boton_si.Bind(wx.EVT_BUTTON, self.seguir_jugando)
+        self.boton_si.Bind(wx.EVT_BUTTON, self.cerrar_juego)
+
+    #Queremos seguir jugando, por lo que guardamos el valor de la apuesta
+    def seguir_jugando(self,event):
+        if self.apuesta_baja.GetValue():
+            self.apuesta = tipo_apuesta[0]
+        elif self.apuesta_media.GetValue():
+            self.apuesta = tipo_apuesta[1]
+        else:
+            self.apuesta = tipo_apuesta[2]
+        self.Close()
+
+    #No queremos que siga jugando, cerramos el juego
+    def cerrar_juego(self,event):
+        self.GetParent().Close()
 
 #Ventana de BlackJack
 class BlackJackWindow(wx.Dialog):
@@ -218,20 +253,10 @@ def main():
     app = BlackJack(0)
     cartas = []
     cartas = generar_cartas()
-
-    #Quiero crear un bitmap en la ventana
-    # Crear un bitmap con la primera carta de la lista de cartas
-    carta_bitmap = wx.StaticBitmap(app.frame.panel_dinamico, wx.ID_ANY, cartas[0])
-    carta_bitmap_2 = wx.StaticBitmap(app.frame.panel_dinamico, wx.ID_ANY, cartas[1])
-   
-    # Agregar el bitmap al sizer correspondiente en la ventana (por ejemplo, sizer_croupier)
-    app.frame.sizer_manos[0].Add(carta_bitmap, 0, wx.ALL, 5)
-    app.frame.sizer_manos[1].Add(carta_bitmap_2, 0, wx.ALL, 5)
-    
-    # Asegúrate de llamar a Layout() para que los cambios en el diseño se reflejen
-    app.frame.Layout()
+    juego = 1
     app.MainLoop()
 
+    
 
 if __name__ == "__main__":
     main()
