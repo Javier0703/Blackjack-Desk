@@ -24,6 +24,7 @@ class Carta(CartaBase):
       palo = palos[self.ind//len(figuras)]
       #Lista con los detalles de la carta [Valor, Indice, Palo]
       return [self.valor,num,palo]
+   
 
 class Mano():
    def __init__(self,datos,nombre,apuesta):
@@ -153,24 +154,6 @@ def volverJugar(game,gamesToPlay,balance):
             print("\nBALANCE FINAL: " + f"{balance}" + " €")
         break
    return volver_jugar
-
-#Funciones para añadir una carta y generar las distintas manos
-def anyadirCartas(mano,numCartas):
-   for i in range(len(mano)):
-      for _ in range(numCartas):
-         mano[i].append(mazo.reparte())
-   return mano
-
-def createMano(mano,nombre,letter,centinela):
-   h = []
-   for element in mano:
-      if len(mano)>1:
-         tmpName = nombre+str(chr(ord(letter) + centinela))
-         centinela+=1
-         h.append(Mano(element,tmpName,apuesta))
-      else:   
-         h.append(Mano(element,nombre,apuesta))
-   return h
 
 #Main
 def main():

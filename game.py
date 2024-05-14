@@ -2,7 +2,7 @@
 """Practica creada por Javier Calvo Porro, estudiante de Ingenieria Informatica, UVa"""
 
 import wx
-import ClasesFunciones
+from ClasesFunciones import *
 
 #Creacion de Funciones/Clases/Variables generales
 reduccion = 0.25
@@ -30,8 +30,9 @@ class Ventana(wx.Frame):
         self.SetTitle("BlackJack")
         self.Center()
 
-        #Modo de juego
         self.modo_juego = 'M'
+        self.forma_texto = wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, "")
+        self.texto_info_manos = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, "")
 
         sizer_general = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -78,22 +79,22 @@ class Ventana(wx.Frame):
         sizer_num_partida = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, "Partida"), wx.HORIZONTAL)
         sizer_conteos.Add(sizer_num_partida, 0, wx.ALL | wx.EXPAND, 5)
         numero_partida = wx.StaticText(self, wx.ID_ANY, "1", style=wx.ALIGN_CENTER_HORIZONTAL)
-        numero_partida.SetFont(wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
+        numero_partida.SetFont(self.forma_texto)
         sizer_num_partida.Add(numero_partida, 1, wx.ALL, 0)
         sizer_balance_partida = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, "Balance Partida"), wx.HORIZONTAL)
         sizer_conteos.Add(sizer_balance_partida, 1, wx.ALL | wx.EXPAND, 5)
         balance_partida = wx.StaticText(self, wx.ID_ANY, "0", style=wx.ALIGN_CENTER_HORIZONTAL)
-        balance_partida.SetFont(wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
+        balance_partida.SetFont(self.forma_texto)
         sizer_balance_partida.Add(balance_partida, 1, wx.ALL, 0)
         sizer_balance_total = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, "Balance Total"), wx.HORIZONTAL)
         sizer_conteos.Add(sizer_balance_total, 1, wx.ALL | wx.EXPAND, 5)
         balance_total = wx.StaticText(self, wx.ID_ANY, "0", style=wx.ALIGN_CENTER_HORIZONTAL)
-        balance_total.SetFont(wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
+        balance_total.SetFont(self.forma_texto)
         sizer_balance_total.Add(balance_total, 1, wx.ALL, 0)
         sizer_tiempo = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, "Tiempo"), wx.HORIZONTAL)
         sizer_conteos.Add(sizer_tiempo, 1, wx.ALL | wx.EXPAND, 5)
         tiempo = wx.StaticText(self, wx.ID_ANY, "10", style=wx.ALIGN_CENTER_HORIZONTAL)
-        tiempo.SetFont(wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
+        tiempo.SetFont(self.forma_texto)
         sizer_tiempo.Add(tiempo, 1, wx.ALL, 0)
 
         #Panel dinamico (Manos)
@@ -105,8 +106,9 @@ class Ventana(wx.Frame):
         self.sizer_manos_generales = wx.BoxSizer(wx.VERTICAL)
 
         #Aqui se generan los BoxSizer para las diferentes manos
-        #Generamos el BoxSizer del Croupier
+        #Generamos el BoxSizer del Croupier con la lista de sus items.
         self.sizer_croupier = wx.BoxSizer(wx.HORIZONTAL)
+        self.items_croupier = []
         self.sizer_manos_generales.Add(self.sizer_croupier, 0, wx.EXPAND, 0)
 
         #manos del Jugador
@@ -120,19 +122,24 @@ class Ventana(wx.Frame):
         self.Layout()
 
         #Definimos todos los eventos de la Ventana para tenerlos todos localizados por si hay fallos
-        self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_a_manual, self.boton_manual)
-        self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_a_automatico, self.boton_automatico)
+        self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_modo, self.boton_manual)
+        self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_modo, self.boton_automatico)
 
     #Se cambia a 
-    def cambiar_a_manual (self,event):
-        self.modo_juego = 'M'
+    def cambiar_modo (self,event):
+        self.modo_juego = 'M' if self.modo_juego == 'A' else 'A'
         print(self.modo_juego)
 
-    def cambiar_a_automatico (self,event):
-        self.modo_juego = 'A'
-        print(self.modo_juego)
+    #Funcion para añadir la información
+    def anyadir_info_croupier(self,info):
+        static_text = wx.StaticText(self.panel_dinamico, wx.ID_ANY, info, style=wx.ALIGN_CENTER_HORIZONTAL)
+        #static_text.SetMinSize((200, 0))  # Define el tamaño fijo aquí
+        static_text.SetFont(self.texto_info_manos)
+        self.items_croupier.append(static_text)
+        self.sizer_croupier.Add(self.items_croupier[0], 1, wx.ALL, 3)
 
-#Dialgo de Nueva Partida
+
+#Dialgo de Nueva Partida    
 class NuevaPartida(wx.Dialog):
     def __init__(self, *args, **kwds):
 
@@ -221,6 +228,26 @@ def main():
     cartas = []
     cartas = generar_cartas()
     juego = 1
+    estrategia = Estrategia(Mazo.NUM_BARAJAS)
+    mazo = Mazo(Carta, estrategia)
+
+    #Funciones para añadir una carta y generar las distintas manos
+    def anyadirCartas(mano,numero_cartas):
+        for i in range(len(mano)):
+            for _ in range(numero_cartas):
+                mano[i].append(mazo.reparte())
+        return mano
+
+    def createMano(mano,nombre,letter,centinela):
+        h = []
+        for element in mano:
+            if len(mano)>1:
+                tmpName = nombre+str(chr(ord(letter) + centinela))
+                centinela+=1
+                h.append(Mano(element,tmpName,apuesta))
+            else:   
+                h.append(Mano(element,nombre,apuesta))
+        return h
 
     while True:
         #Definimos una ventana de Nueva partida que sea 'hija' de la Ventana main
@@ -230,7 +257,25 @@ def main():
         #Guardamos la apuesta
         apuesta = nueva_partida.apuesta
         
-        #Aqui va a estar generando el juego todo el rato hasta que uno no quiera
+        #Genramos las manos iniciales del Croupier y del Jugador
+        nombre, letter = nombres[1], 'A'
+        centinela, cartas_por_mano = 0,1
+
+        croupier, mano_croupier = [[]],[]
+        croupier = anyadirCartas(croupier,cartas_por_mano)
+        mano_croupier = createMano(croupier,nombre,letter,centinela)
+
+        nombre = nombres[0]
+        cartas_por_mano =  2
+        #Guardamos las cartas (Type Carta), las manos (Type Mano) y el formato carta para su impreson respectivamente
+        jugador, mano_jugador = [[]], []
+        jugador = anyadirCartas(jugador,cartas_por_mano)
+        mano_jugador = createMano(jugador,nombre,letter,centinela)
+
+        #Ya tenemos creada las manos iniciales, ahora toca colocarlas en la interfaz
+        info_croupier = f"{mano_croupier[0].nombre}\n{mano_croupier[0].sumaCartas}\n{mano_croupier[0].estado}"
+        app.frame.anyadir_info_croupier(info_croupier)
+
         break
     app.MainLoop()
 

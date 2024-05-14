@@ -6,12 +6,6 @@
 
 import wx
 
-# begin wxGlade: dependencies
-# end wxGlade
-
-# begin wxGlade: extracode
-# end wxGlade
-
 
 class Ventana(wx.Frame):
     def __init__(self, *args, **kwds):
