@@ -112,9 +112,10 @@ class Ventana(wx.Frame):
         self.sizer_manos_generales.Add(self.sizer_croupier, 0, wx.EXPAND, 0)
 
         #manos del Jugador
-        #El metodo es usar una lista con los paneles (manos) y los BoxSizer que es su contenido
-        self.slizer_paneles_jugador = []
-        self.slizer_boxsizers_jugador = []
+        #El metodo es usar una lista con los paneles (manos) los BoxSizer y su contenido
+        self.sizer_paneles_jugador = []
+        self.boxsizers_jugador = []
+        self.items_jugador = [[]]
 
         #Generame un Panel dentro de la lista anterior
         self.panel_dinamico.SetSizer(self.sizer_manos_generales)
@@ -125,19 +126,53 @@ class Ventana(wx.Frame):
         self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_modo, self.boton_manual)
         self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_modo, self.boton_automatico)
 
-    #Se cambia a 
+    #Se cambia el modo
     def cambiar_modo (self,event):
         self.modo_juego = 'M' if self.modo_juego == 'A' else 'A'
         print(self.modo_juego)
 
     #Funcion para añadir la información
-    def anyadir_info_croupier(self,info):
+    def anyadir_info_croupier(self, info):
         static_text = wx.StaticText(self.panel_dinamico, wx.ID_ANY, info, style=wx.ALIGN_CENTER_HORIZONTAL)
-        #static_text.SetMinSize((200, 0))  # Define el tamaño fijo aquí
         static_text.SetFont(self.texto_info_manos)
         self.items_croupier.append(static_text)
-        self.sizer_croupier.Add(self.items_croupier[0], 1, wx.ALL, 3)
+        self.sizer_croupier.Add(self.items_croupier[0], 0, wx.ALL | wx.EXPAND, 5)
+        self.Layout()
 
+    #Funcion para añadir carta al croupier
+    def anyadir_carta_croupier(self, cartas, id):
+        static_bitmap = wx.StaticBitmap(self.panel_dinamico, wx.ID_ANY, cartas[id])
+        self.items_croupier.append(static_bitmap)
+        self.sizer_croupier.Add(self.items_croupier[-1], 0, wx.ALL | wx.EXPAND, 5)
+        self.Layout()
+
+    # Funcion para generar un nuevo panel
+    def nuevo_panel (self, info):
+        self.sizer_paneles_jugador.append(wx.Panel(self.panel_dinamico, wx.ID_ANY))
+        self.sizer_manos_generales.Add(self.sizer_paneles_jugador[-1], 0, wx.EXPAND, 0)
+        self.info_jugador = info
+        self.nuevo_boxizer_jugador()
+
+    # Funcion para generar un nuevo boxsizer
+    def nuevo_boxizer_jugador (self):
+        self.boxsizers_jugador.append(wx.BoxSizer(wx.HORIZONTAL))
+        self.anyadir_info_jugador()
+
+    #Funcion para anyadir información
+    def anyadir_info_jugador(self):
+        static_text = wx.StaticText(self.sizer_paneles_jugador[-1], wx.ID_ANY, self.info_jugador, style=wx.ALIGN_CENTER_HORIZONTAL)
+        static_text.SetFont(self.texto_info_manos)
+        self.items_jugador[len(self.boxsizers_jugador)-1].append(static_text)
+        self.boxsizers_jugador[-1].Add(self.items_jugador[-1][0], 0, wx.ALL | wx.EXPAND, 5)
+        self.sizer_paneles_jugador[-1].SetSizer(self.boxsizers_jugador[-1])
+        self.Layout()
+    
+    #Añadir las cartas iniciales
+    def anyadir_cartas_iniciales(self, cartas, id):
+        static_bitmap = wx.StaticBitmap(self.sizer_paneles_jugador[-1], wx.ID_ANY, cartas[id])
+        self.items_jugador[-1].append(static_bitmap)
+        self.boxsizers_jugador[-1].Add(static_bitmap, 0, wx.ALL | wx.EXPAND, 5)
+        self.Layout()
 
 #Dialgo de Nueva Partida    
 class NuevaPartida(wx.Dialog):
@@ -214,7 +249,6 @@ class BlackJackWindow(wx.Dialog):
         sizer_dialogo_blackjack.Fit(self)
         self.Layout()
     
-
 class BlackJack(wx.App):
     def OnInit(self):
         self.frame = Ventana(None, wx.ID_ANY, "")
@@ -274,8 +308,13 @@ def main():
 
         #Ya tenemos creada las manos iniciales, ahora toca colocarlas en la interfaz
         info_croupier = f"{mano_croupier[0].nombre}\n{mano_croupier[0].sumaCartas}\n{mano_croupier[0].estado}"
+        carta = croupier[0][0].ind
         app.frame.anyadir_info_croupier(info_croupier)
-
+        app.frame.anyadir_carta_croupier(cartas, carta)
+        info_jugador = f"{mano_jugador[0].sumaCartas}\n{mano_jugador[0].apuesta} €\n{mano_jugador[0].estado}"
+        app.frame.nuevo_panel(info=info_jugador)
+        for i in range(2):
+            app.frame.anyadir_cartas_iniciales(cartas=cartas,id=jugador[0][i].ind)
         break
     app.MainLoop()
 
