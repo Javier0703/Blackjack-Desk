@@ -34,7 +34,7 @@ class Ventana(wx.Frame):
 
         self.modo_juego = 'M'
         self.tiempo_retardo = 100
-        self.juego = 1
+        self.juego = 0
         self.balance = 0
         self.balance_global = 0
         self.forma_texto = wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, "")
@@ -84,9 +84,9 @@ class Ventana(wx.Frame):
         sizer_col_estatica.Add(sizer_conteos, 0, wx.EXPAND, 10)
         sizer_num_partida = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, "Partida"), wx.HORIZONTAL)
         sizer_conteos.Add(sizer_num_partida, 0, wx.ALL | wx.EXPAND, 5)
-        numero_partida = wx.StaticText(self, wx.ID_ANY, f"{self.juego}", style=wx.ALIGN_CENTER_HORIZONTAL)
-        numero_partida.SetFont(self.forma_texto)
-        sizer_num_partida.Add(numero_partida, 1, wx.ALL, 0)
+        self.numero_partida = wx.StaticText(self, wx.ID_ANY, f"{self.juego}", style=wx.ALIGN_CENTER_HORIZONTAL)
+        self.numero_partida.SetFont(self.forma_texto)
+        sizer_num_partida.Add(self.numero_partida, 1, wx.ALL, 0)
         sizer_balance_partida = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, "Balance Partida"), wx.HORIZONTAL)
         sizer_conteos.Add(sizer_balance_partida, 1, wx.ALL | wx.EXPAND, 5)
         self.balance_partida = wx.StaticText(self, wx.ID_ANY, f"{self.balance}", style=wx.ALIGN_CENTER_HORIZONTAL)
@@ -133,6 +133,22 @@ class Ventana(wx.Frame):
         self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_modo, self.boton_automatico)
         self.Bind(wx.EVT_TEXT, self.actualizar_retardo, self.retardo)
 
+    #Funcion para eliminar los elementos dinamicos (Nueva partida)
+    def eliminar_elementos(self):
+        #Eliminamos los elementos del jugador:
+        for bs in self.boxsizers_jugador:
+            bs.Clear(delete_windows = True)
+        for panel in self.sizer_paneles_jugador:
+            panel.GetSizer().Clear(True) 
+        self.sizer_paneles_jugador = []
+        self.boxsizers_jugador = []
+        self.items_jugador = [[]]
+       
+        #Eliminamos los elementos del croupier
+        self.sizer_croupier.Clear(delete_windows=True)
+        self.items_croupier = []
+        self.Layout()
+
     #Se cambia el modo
     def cambiar_modo (self,event):
         self.modo_juego = 'M' if self.modo_juego == 'A' else 'A'
@@ -152,6 +168,11 @@ class Ventana(wx.Frame):
         self.balance_global += balance
         self.balance_partida.SetLabel(f"{self.balance} €")
         self.balance_total.SetLabel(f"{self.balance_global} €")
+        self.Layout()
+
+    def anyadir_partida(self):
+        self.juego +=1
+        self.numero_partida.SetLabel(f"{self.juego}")
         self.Layout()
 
     #Funcion para añadir la información
@@ -279,6 +300,16 @@ class BlackJackWindow(wx.Dialog):
         sizer_dialogo_blackjack.Fit(self)
         self.Layout()
 
+        self.Bind(wx.EVT_BUTTON, self.cerrar_ventana, self.boton_ok)
+
+    def mostrar_ventana(self):
+        self.Center()
+        self.Show()
+        wx.CallLater(3000,self.cerrar_ventana)
+
+    def cerrar_ventana(self):
+        self.Close()
+
     # Mostrar la apuesta ganada
     def cambiar_apuesta(self,apuesta):
         self.label_dinero_blackjack.SetLabel(f"{apuesta} €")
@@ -293,6 +324,7 @@ class BlackJack(wx.App):
 
 #Definimos el main
 def main():
+    #Definimos la instancia del juego: la app, las imagenes, y la estrategia y el mazo como la anterior
     app = BlackJack(0)
     cartas = []
     cartas = generar_cartas()
@@ -325,6 +357,9 @@ def main():
                     break
             return blackjack
 
+    """ He tenido complicaciones a la hora de usar el bucle. Por lo que he creado una funcion
+    'Recursiva' que se vaya recorriendo segun las """
+
     while True:
         #Definimos una ventana de Nueva partida que sea 'hija' de la Ventana main
         nueva_partida = NuevaPartida(app.frame, wx.ID_ANY, "")
@@ -335,7 +370,10 @@ def main():
 
         if nueva_partida.querer_jugar == False:
             break
-        
+
+        #Se inicia una nueva partida (El usuario ha aceptado)
+        app.frame.anyadir_partida()
+        app.frame.eliminar_elementos()
         #Genramos las manos iniciales del Croupier y del Jugador
         nombre, letter = nombres[1], 'A'
         centinela, cartas_por_mano = 0,1
@@ -369,14 +407,12 @@ def main():
             blackjack_window = BlackJackWindow(None, title="BlackJack")
             apuesta_ganada = round(apuesta*(3/2))
             blackjack_window.cambiar_apuesta(apuesta = apuesta_ganada)
-            #CAMBIAR APUESTA DENRO DE APP.FRAME
-            blackjack_window.Center()
-            blackjack_window.Show()
             app.frame.cambiar_balances(apuesta_ganada)
-            # Programar el cierre del diálogo después de 2 segundos
-            wx.CallLater(3000, blackjack_window.Close)
+            #CAMBIAR APUESTA DENRO DE APP.FRAME
+            blackjack_window.mostrar_ventana()
 
         else:
+            #Crear otras cosas mias que te ire comentando
             break
 
     app.MainLoop()
