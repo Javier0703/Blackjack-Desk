@@ -2,7 +2,6 @@
 """Practica creada por Javier Calvo Porro, estudiante de Ingenieria Informatica, UVa"""
 
 import wx
-import time
 from ClasesFunciones import *
 
 #Creacion de Funciones/Clases/Variables generales
@@ -32,13 +31,19 @@ class Ventana(wx.Frame):
         self.SetTitle("BlackJack")
         self.Center()
 
+        #Propiedades creadas a mano para su uso
         self.modo_juego = 'M'
         self.tiempo_retardo = 100
         self.juego = 0
         self.balance = 0
         self.balance_global = 0
+
+        # Propiedades wx.Python
         self.forma_texto = wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, "")
         self.texto_info_manos = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, "")
+        self.panel_activo = wx.Colour(255, 255, 204)
+        self.panel_perdido = wx.Colour(255, 0, 0)
+        self.panel_ganado =  wx.Colour(0, 128, 0)
 
         sizer_general = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -121,7 +126,7 @@ class Ventana(wx.Frame):
         #El metodo es usar una lista con los paneles (manos) los BoxSizer y su contenido
         self.sizer_paneles_jugador = []
         self.boxsizers_jugador = []
-        self.items_jugador = [[]]
+        self.items_jugador = []
 
         #Generame un Panel dentro de la lista anterior
         self.panel_dinamico.SetSizer(self.sizer_manos_generales)
@@ -142,7 +147,7 @@ class Ventana(wx.Frame):
             panel.GetSizer().Clear(True) 
         self.sizer_paneles_jugador = []
         self.boxsizers_jugador = []
-        self.items_jugador = [[]]
+        self.items_jugador = []
        
         #Eliminamos los elementos del croupier
         self.sizer_croupier.Clear(delete_windows=True)
@@ -170,6 +175,7 @@ class Ventana(wx.Frame):
         self.balance_total.SetLabel(f"{self.balance_global} €")
         self.Layout()
 
+    #Funcion para anadir una partidamas
     def anyadir_partida(self):
         self.juego +=1
         self.numero_partida.SetLabel(f"{self.juego}")
@@ -196,11 +202,13 @@ class Ventana(wx.Frame):
         self.sizer_paneles_jugador.append(wx.Panel(self.panel_dinamico, wx.ID_ANY))
         self.sizer_manos_generales.Add(self.sizer_paneles_jugador[-1], 0, wx.EXPAND, 0)
         self.info_jugador = info
+        self.sizer_paneles_jugador[0].SetBackgroundColour(self.panel_activo)
         self.nuevo_boxizer_jugador()
 
     # Funcion para generar un nuevo boxsizer
     def nuevo_boxizer_jugador (self):
         self.boxsizers_jugador.append(wx.BoxSizer(wx.HORIZONTAL))
+        self.items_jugador.append([])
         self.anyadir_info_jugador()
 
     #Funcion para anyadir información
@@ -305,9 +313,12 @@ class BlackJackWindow(wx.Dialog):
     def mostrar_ventana(self):
         self.Center()
         self.Show()
-        wx.CallLater(3000,self.cerrar_ventana)
+        wx.CallLater(3000,self.cerrar_ventana_automatico)
 
-    def cerrar_ventana(self):
+    def cerrar_ventana_automatico(self):
+        self.Close()
+
+    def cerrar_ventana(self,event):
         self.Close()
 
     # Mostrar la apuesta ganada
@@ -328,6 +339,7 @@ def main():
     app = BlackJack(0)
     cartas = []
     cartas = generar_cartas()
+    apuesta = 0             #Iniciamos la isntancia de la apuesta
     estrategia = Estrategia(Mazo.NUM_BARAJAS)
     mazo = Mazo(Carta, estrategia)
 
@@ -338,7 +350,7 @@ def main():
                 mano[i].append(mazo.reparte())
         return mano
 
-    def createMano(mano,nombre,letter,centinela):
+    def createMano(mano,nombre,letter,centinela, apuesta):
         h = []
         for element in mano:
             if len(mano)>1:
@@ -358,9 +370,9 @@ def main():
             return blackjack
 
     """ He tenido complicaciones a la hora de usar el bucle. Por lo que he creado una funcion
-    'Recursiva' que se vaya recorriendo segun las """
+    'Recursiva' que se vaya recorriendo segun las acciones (Los dialogos no esperaban el tiempo) """
 
-    while True:
+    def inicializacion_juego():
         #Definimos una ventana de Nueva partida que sea 'hija' de la Ventana main
         nueva_partida = NuevaPartida(app.frame, wx.ID_ANY, "")
         nueva_partida.Center()
@@ -368,8 +380,9 @@ def main():
         #Guardamos la apuesta
         apuesta = nueva_partida.apuesta
 
+        #Comprobamos si realmente quiere jugar o no
         if nueva_partida.querer_jugar == False:
-            break
+            return
 
         #Se inicia una nueva partida (El usuario ha aceptado)
         app.frame.anyadir_partida()
@@ -380,14 +393,14 @@ def main():
 
         croupier, mano_croupier = [[]],[]
         croupier = anyadirCartas(croupier,cartas_por_mano)
-        mano_croupier = createMano(croupier,nombre,letter,centinela)
+        mano_croupier = createMano(croupier,nombre,letter,centinela, apuesta)
 
         nombre = nombres[0]
         cartas_por_mano =  2
         #Guardamos las cartas (Type Carta), las manos (Type Mano) y el formato carta para su impreson respectivamente
         jugador, mano_jugador = [[]], []
         jugador = anyadirCartas(jugador,cartas_por_mano)
-        mano_jugador = createMano(jugador,nombre,letter,centinela)
+        mano_jugador = createMano(jugador,nombre,letter,centinela, apuesta)
 
         #Ya tenemos creada las manos iniciales, ahora toca colocarlas en la interfaz
         info_croupier = f"{mano_croupier[0].nombre}\n({mano_croupier[0].sumaCartas})\n{mano_croupier[0].estado}"
@@ -410,11 +423,14 @@ def main():
             app.frame.cambiar_balances(apuesta_ganada)
             #CAMBIAR APUESTA DENRO DE APP.FRAME
             blackjack_window.mostrar_ventana()
+            #Volvemos al juego
+            wx.CallLater(3000, inicializacion_juego) 
 
         else:
             #Crear otras cosas mias que te ire comentando
-            break
+            return
 
+    inicializacion_juego()
     app.MainLoop()
 
 
