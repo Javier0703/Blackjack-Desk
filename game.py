@@ -24,13 +24,14 @@ class PanelJugador(wx.Panel):
  
         self.index = index
         self.cartas_jugador = cartas_jugador
-        self.mano_jugador = mano_jugador        
+        self.mano_jugador = mano_jugador
+        self.lista_cartas = []        
 
         # Creamos la estructura
         self.sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # Información a añadir
-        self.informacion = f"({mano_jugador.sumaCartas})\n({mano_jugador.apuesta} €)\n{mano_jugador.estado}"
+        self.informacion = f"({mano_jugador.sumaCartas})\n{mano_jugador.apuesta} €\n{mano_jugador.estado}"
         self.info = wx.StaticText(self, wx.ID_ANY, self.informacion, style=wx.ALIGN_CENTER_HORIZONTAL)
         self.info.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
         self.info.SetMinSize((150, 100))
@@ -39,6 +40,7 @@ class PanelJugador(wx.Panel):
         # Bucle para añadir las imágenes
         for carta in cartas_jugador:
             static_bitmap = wx.StaticBitmap(self, wx.ID_ANY, cartas[carta.ind])
+            self.lista_cartas.append(static_bitmap)
             self.sizer.Add(static_bitmap, 0, wx.ALL | wx.EXPAND, 5)
 
         self.SetSizer(self.sizer)
@@ -65,6 +67,7 @@ class Ventana(wx.Frame):
         self.balance_global = 0
         self.reduccion = 0.25
         self.cartas = generar_cartas(reduccion=self.reduccion)
+        self.panel_seleccionado = 0
 
         # Generamos la estrategia y el mazo como en la practica anterior
         self.estrategia = Estrategia(Mazo.NUM_BARAJAS)
@@ -72,7 +75,8 @@ class Ventana(wx.Frame):
 
         #Informacion del croupier
         self.cartas_croupier = []
-        self.mano_croupier = []
+        self.mano_croupier = ""
+        self.info_mano_croupier = ""
 
         # Propiedades wx.Python
         self.forma_texto = wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, "")
@@ -156,7 +160,6 @@ class Ventana(wx.Frame):
 
         #Generamos el BoxSizer del Croupier con la lista de sus items.
         self.sizer_croupier = wx.BoxSizer(wx.HORIZONTAL)
-        self.items_croupier = []
         self.sizer_manos_generales.Add(self.sizer_croupier, 0, wx.EXPAND, 0)
 
         # Manos del Jugador
@@ -175,11 +178,11 @@ class Ventana(wx.Frame):
         
         self.nuevo_juego()
      
-    #Se cambia el modo
+    # GLOBAL: Se cambia el modo
     def cambiar_modo (self,event):
         self.modo_juego = 'M' if self.modo_juego == 'A' else 'A'
 
-    #Actualizar el retardo cada vez que hay cambios (sin necesidad de enter)
+    #GLOBAL: Actualizar el retardo cada vez que hay cambios (sin necesidad de enter)
     def actualizar_retardo(self,event):
         #Modificacion del retardo, por si hay 
         retardo_texto = self.retardo.GetValue()
@@ -190,17 +193,17 @@ class Ventana(wx.Frame):
         self.Layout()
         print(self.retardo)
 
-    #Agregar una partida mas
+    #GLOBAL: Agregar una partida mas
     def agregar_partida(self):
         self.juego_actual += 1
         self.numero_partida.SetLabel(f"{self.juego_actual}")
         self.Layout()  
 
-    #Funcion para iniciar un nuevo juego
+    # INICIAL: Funcion para iniciar un nuevo juego
     def nuevo_juego(self):
         wx.CallLater(10, self.init_game)
 
-    #Creacion del juego -> Apertura de dialogo    
+    #INICIAL :Creacion del juego -> Apertura de dialogo    
     def init_game(self):
         #Seleccion de la Apuesta
         nueva_ventana = NuevaPartida(self)
@@ -215,18 +218,15 @@ class Ventana(wx.Frame):
             self.agregar_partida()
             self.generar_manos()
 
-    # Generar las diversas manos
+    # INICIAL: Generar las diversas manos
     def generar_manos(self):
         self.eliminar_elementos()
-        self.cartas_croupier.append(self.mazo.reparte())
-        self.mano_croupier.append()
-
-
-    #Funcion para eliminar los elementos
+        wx.CallLater(100, self.anyadir_croupier)
+        wx.CallLater(200, self.anyadir_primer_panel)
+    
+    # GLOBAL: Funcion para eliminar los elementos
     def eliminar_elementos(self):
         #Eliminamos elementos del jugador
-        self.mano_croupier = []
-        self.cartas_croupier = []
         for panel in self.paneles_jugador:
             panel.GetSizer().Clear(True)
         self.paneles_jugador = []    
@@ -235,12 +235,66 @@ class Ventana(wx.Frame):
         self.sizer_croupier.Clear(delete_windows=True)
         self.mano_croupier = []
         self.cartas_croupier = []
-        self.items_croupier = []
         self.Layout()
-            
 
+    # INICIAL: Funcion añadir elementos al croupier  
+    def anyadir_croupier(self):
+        self.cartas_croupier.append(self.mazo.reparte())
+        self.mano_croupier = Mano(self.cartas_croupier,'Croupier', self.apuesta)
+        self.generar_info_croupier()
+        self.modificar_info_croupier()
+        self.anyadir_carta_panel(indice = self.cartas_croupier[0].ind)
 
+    # INICIAL: Funcion para generar la info del croupier
+    def generar_info_croupier(self):
+        self.info_croupier = wx.StaticText(self.panel_dinamico, wx.ID_ANY, self.info_mano_croupier, style=wx.ALIGN_CENTER_HORIZONTAL)
+        self.info_croupier.SetFont(self.texto_info_manos)
+        self.info_croupier.SetMinSize((150,100))
+        self.sizer_croupier.Add(self.info_croupier, 0, wx.ALL | wx.EXPAND, 5)
+        self.Layout()
 
+    # GLOBAL: Funcion para modificar la info del croupier
+    def modificar_info_croupier(self):
+        self.mano_croupier.actualizarDatosMano()
+        info = f"{self.mano_croupier.nombre}\n({self.mano_croupier.sumaCartas})\n{self.mano_croupier.estado}"
+        self.info_croupier.SetLabel(info)
+        self.Layout()  
+
+    # GLOBAL: Funcion para añadir una carta al panel
+    def anyadir_carta_panel(self, indice):
+        carta = wx.StaticBitmap(self.panel_dinamico, wx.ID_ANY, self.cartas[indice])  
+        self.sizer_croupier.Add(carta, 0, wx.ALL | wx.EXPAND, 5)  
+        self.Layout() 
+
+    # INICIAL: Genera el primer panel y lo añade
+    def anyadir_primer_panel(self):
+        numero_cartas = 2
+        cartas_mazo = []
+        for _ in range(numero_cartas):
+            cartas_mazo.append(self.mazo.reparte())
+        mano_panel = Mano(cartas_mazo, 'Jugador', self.apuesta)
+        self.nuevo_panel = PanelJugador(parent=self.panel_dinamico, id=wx.ID_ANY, index= len(self.paneles_jugador), cartas_jugador=cartas_mazo, mano_jugador=mano_panel, cartas= self.cartas)
+        self.nuevo_panel.Bind(wx.EVT_LEFT_DOWN, self.seleccionar_panel)
+        self.paneles_jugador.append(self.nuevo_panel)
+        self.sizer_manos_generales.Add(self.nuevo_panel, 0, wx.EXPAND, 0 )
+        self.Layout()
+        #self.comporbar_blackjack()
+
+    # GLOBAL: Seleccionar panel
+    def seleccionar_panel(self, event):
+        self.boton_pedir.Enable()
+        self.boton_cerrar.Enable()
+        self.boton_doblar.Enable()
+        #Pintamos de color
+        for panel in self.paneles_jugador:
+            if panel == event.GetEventObject():
+                panel.SetBackgroundColour(self.panel_activo)
+                self.panel_seleccionado = panel.index
+                print(self.panel_seleccionado)
+            else:
+                panel.SetBackgroundColour(wx.NullColour)
+            self.Refresh()
+        
 #DIALOGO DE NUEVA PARTIDA    
 class NuevaPartida(wx.Dialog):
     def __init__(self ,*args, **kwds):
