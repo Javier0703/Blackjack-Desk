@@ -4,14 +4,11 @@
 import wx
 from ClasesFunciones import *
 
-#Creacion de Funciones/Clases/Variables generales
-reduccion = 0.25
+#Creacion de Funciones/Clases
 tipo_apuesta = [2,10,50]
-valor_maximo_manos = [21,17]
-balance = 0
 
 #Funcion para generar las cartas (Bitmap)
-def generar_cartas():
+def generar_cartas(reduccion):
     m = []
     for i in range(52):
         img = wx.Image(f"Imagenes//Cartas//{i}.png", wx.BITMAP_TYPE_ANY)
@@ -20,23 +17,62 @@ def generar_cartas():
         m.append(wx.Bitmap(img))
     return m
 
-#Clase Ventana (Donde se encuentra la interfaz)
+#CLASE PAEL JUGADOR (Contendra toda la info -> Mano y Cartas)
+class PanelJugador(wx.Panel):
+    def __init__(self, parent, id, index, cartas_jugador, mano_jugador, cartas, *args, **kwds):
+        super().__init__(parent, id, *args, **kwds)
+ 
+        self.index = index
+        self.cartas_jugador = cartas_jugador
+        self.mano_jugador = mano_jugador        
+
+        # Creamos la estructura
+        self.sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # Información a añadir
+        self.informacion = f"({mano_jugador.sumaCartas})\n({mano_jugador.apuesta} €)\n{mano_jugador.estado}"
+        self.info = wx.StaticText(self, wx.ID_ANY, self.informacion, style=wx.ALIGN_CENTER_HORIZONTAL)
+        self.info.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
+        self.info.SetMinSize((150, 100))
+        self.sizer.Add(self.info, 0, wx.ALL | wx.EXPAND, 5)
+
+        # Bucle para añadir las imágenes
+        for carta in cartas_jugador:
+            static_bitmap = wx.StaticBitmap(self, wx.ID_ANY, cartas[carta.ind])
+            self.sizer.Add(static_bitmap, 0, wx.ALL | wx.EXPAND, 5)
+
+        self.SetSizer(self.sizer)
+        self.Layout()
+
+#CLASE VENTANA (Donde se encuentra la interfaz)
 class Ventana(wx.Frame):
     def __init__(self, *args, **kwds):
         # begin wxGlade: Ventana.__init__
         kwds["style"] = kwds.get("style", 0) | wx.DEFAULT_FRAME_STYLE
         wx.Frame.__init__(self, *args, **kwds)
-        #Definimos el tamaño, titulo y lo centramos
+        #Definimos el tamaño, titulo y lo centramos por si se minimiza
         self.SetSize((1000, 600))
         self.SetTitle("BlackJack")
         self.Center()
+        self.Maximize()
 
         #Propiedades creadas a mano para su uso
+        self.apuesta = 0
         self.modo_juego = 'M'
         self.tiempo_retardo = 100
-        self.juego = 0
+        self.juego_actual = 0
         self.balance = 0
         self.balance_global = 0
+        self.reduccion = 0.25
+        self.cartas = generar_cartas(reduccion=self.reduccion)
+
+        # Generamos la estrategia y el mazo como en la practica anterior
+        self.estrategia = Estrategia(Mazo.NUM_BARAJAS)
+        self.mazo = Mazo(Carta, self.estrategia)
+
+        #Informacion del croupier
+        self.cartas_croupier = []
+        self.mano_croupier = []
 
         # Propiedades wx.Python
         self.forma_texto = wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, "")
@@ -45,6 +81,7 @@ class Ventana(wx.Frame):
         self.panel_perdido = wx.Colour(255, 0, 0)
         self.panel_ganado =  wx.Colour(0, 128, 0)
 
+        #Sizer general de la ventana (Dos columnas)
         sizer_general = wx.BoxSizer(wx.HORIZONTAL)
 
         #Sizer de la colukna estatica (donde estan los botonos, el balance...)
@@ -89,7 +126,7 @@ class Ventana(wx.Frame):
         sizer_col_estatica.Add(sizer_conteos, 0, wx.EXPAND, 10)
         sizer_num_partida = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, "Partida"), wx.HORIZONTAL)
         sizer_conteos.Add(sizer_num_partida, 0, wx.ALL | wx.EXPAND, 5)
-        self.numero_partida = wx.StaticText(self, wx.ID_ANY, f"{self.juego}", style=wx.ALIGN_CENTER_HORIZONTAL)
+        self.numero_partida = wx.StaticText(self, wx.ID_ANY, f"{self.juego_actual}", style=wx.ALIGN_CENTER_HORIZONTAL)
         self.numero_partida.SetFont(self.forma_texto)
         sizer_num_partida.Add(self.numero_partida, 1, wx.ALL, 0)
         sizer_balance_partida = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, "Balance Partida"), wx.HORIZONTAL)
@@ -115,18 +152,16 @@ class Ventana(wx.Frame):
 
         #Slizer para las manos generadas
         self.sizer_manos_generales = wx.BoxSizer(wx.VERTICAL)
-
         #Aqui se generan los BoxSizer para las diferentes manos
+
         #Generamos el BoxSizer del Croupier con la lista de sus items.
         self.sizer_croupier = wx.BoxSizer(wx.HORIZONTAL)
         self.items_croupier = []
         self.sizer_manos_generales.Add(self.sizer_croupier, 0, wx.EXPAND, 0)
 
-        #manos del Jugador
-        #El metodo es usar una lista con los paneles (manos) los BoxSizer y su contenido
-        self.sizer_paneles_jugador = []
-        self.boxsizers_jugador = []
-        self.items_jugador = []
+        # Manos del Jugador
+        # Se van a crear paneles que pueda interactuar con ellos ( hacer click ) A poder ser usando la clase PanelJugador. Como lo hago?
+        self.paneles_jugador = []
 
         #Generame un Panel dentro de la lista anterior
         self.panel_dinamico.SetSizer(self.sizer_manos_generales)
@@ -137,108 +172,85 @@ class Ventana(wx.Frame):
         self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_modo, self.boton_manual)
         self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_modo, self.boton_automatico)
         self.Bind(wx.EVT_TEXT, self.actualizar_retardo, self.retardo)
-
-    #Funcion para eliminar los elementos dinamicos (Nueva partida)
-    def eliminar_elementos(self):
-        #Eliminamos los elementos del jugador:
-        for bs in self.boxsizers_jugador:
-            bs.Clear(delete_windows = True)
-        for panel in self.sizer_paneles_jugador:
-            panel.GetSizer().Clear(True) 
-        self.sizer_paneles_jugador = []
-        self.boxsizers_jugador = []
-        self.items_jugador = []
-       
-        #Eliminamos los elementos del croupier
-        self.sizer_croupier.Clear(delete_windows=True)
-        self.items_croupier = []
-        self.Layout()
-
+        
+        self.nuevo_juego()
+     
     #Se cambia el modo
     def cambiar_modo (self,event):
         self.modo_juego = 'M' if self.modo_juego == 'A' else 'A'
 
     #Actualizar el retardo cada vez que hay cambios (sin necesidad de enter)
     def actualizar_retardo(self,event):
+        #Modificacion del retardo, por si hay 
         retardo_texto = self.retardo.GetValue()
         try:
             self.tiempo_retardo = int(retardo_texto)
         except ValueError:
-            pass            #Si no es un entero, pasa (manejo de errores)
+            pass      
         self.Layout()
+        print(self.retardo)
 
-    # Para cambiar los balances del juego (Total y del Juego)
-    def cambiar_balances(self,balance):
-        self.balance = balance
-        self.balance_global += balance
-        self.balance_partida.SetLabel(f"{self.balance} €")
-        self.balance_total.SetLabel(f"{self.balance_global} €")
+    #Agregar una partida mas
+    def agregar_partida(self):
+        self.juego_actual += 1
+        self.numero_partida.SetLabel(f"{self.juego_actual}")
+        self.Layout()  
+
+    #Funcion para iniciar un nuevo juego
+    def nuevo_juego(self):
+        wx.CallLater(10, self.init_game)
+
+    #Creacion del juego -> Apertura de dialogo    
+    def init_game(self):
+        #Seleccion de la Apuesta
+        nueva_ventana = NuevaPartida(self)
+        nueva_ventana.Center()
+        nueva_ventana.ShowModal()
+
+        if nueva_ventana.querer_jugar == False:
+            self.Close()
+
+        else:
+            self.apuesta = nueva_ventana.apuesta
+            self.agregar_partida()
+            self.generar_manos()
+
+    # Generar las diversas manos
+    def generar_manos(self):
+        self.eliminar_elementos()
+        self.cartas_croupier.append(self.mazo.reparte())
+        self.mano_croupier.append()
+
+
+    #Funcion para eliminar los elementos
+    def eliminar_elementos(self):
+        #Eliminamos elementos del jugador
+        self.mano_croupier = []
+        self.cartas_croupier = []
+        for panel in self.paneles_jugador:
+            panel.GetSizer().Clear(True)
+        self.paneles_jugador = []    
+
+        # Elementos del Croupier
+        self.sizer_croupier.Clear(delete_windows=True)
+        self.mano_croupier = []
+        self.cartas_croupier = []
+        self.items_croupier = []
         self.Layout()
+            
 
-    #Funcion para anadir una partidamas
-    def anyadir_partida(self):
-        self.juego +=1
-        self.numero_partida.SetLabel(f"{self.juego}")
-        self.Layout()
 
-    #Funcion para añadir la información
-    def anyadir_info_croupier(self, info):  
-        static_text = wx.StaticText(self.panel_dinamico, wx.ID_ANY, info, style=wx.ALIGN_CENTER_HORIZONTAL)
-        static_text.SetFont(self.texto_info_manos)
-        static_text.SetMinSize((150,100))
-        self.items_croupier.append(static_text)
-        self.sizer_croupier.Add(self.items_croupier[0], 0, wx.ALL | wx.EXPAND, 5)
-        self.Layout()
 
-    #Funcion para añadir carta al croupier
-    def anyadir_carta_croupier(self, cartas, id):
-        static_bitmap = wx.StaticBitmap(self.panel_dinamico, wx.ID_ANY, cartas[id])
-        self.items_croupier.append(static_bitmap)
-        self.sizer_croupier.Add(self.items_croupier[-1], 0, wx.ALL | wx.EXPAND, 5)
-        self.Layout()
-
-    # Funcion para generar un nuevo panel
-    def nuevo_panel (self, info):
-        self.sizer_paneles_jugador.append(wx.Panel(self.panel_dinamico, wx.ID_ANY))
-        self.sizer_manos_generales.Add(self.sizer_paneles_jugador[-1], 0, wx.EXPAND, 0)
-        self.info_jugador = info
-        self.sizer_paneles_jugador[0].SetBackgroundColour(self.panel_activo)
-        self.nuevo_boxizer_jugador()
-
-    # Funcion para generar un nuevo boxsizer
-    def nuevo_boxizer_jugador (self):
-        self.boxsizers_jugador.append(wx.BoxSizer(wx.HORIZONTAL))
-        self.items_jugador.append([])
-        self.anyadir_info_jugador()
-
-    #Funcion para anyadir información
-    def anyadir_info_jugador(self):
-        static_text = wx.StaticText(self.sizer_paneles_jugador[-1], wx.ID_ANY, self.info_jugador, style=wx.ALIGN_CENTER_HORIZONTAL)
-        static_text.SetFont(self.texto_info_manos)
-        static_text.SetMinSize((150,100))
-        self.items_jugador[len(self.boxsizers_jugador)-1].append(static_text)
-        self.boxsizers_jugador[-1].Add(self.items_jugador[-1][0], 0, wx.ALL | wx.EXPAND, 5)
-        self.sizer_paneles_jugador[-1].SetSizer(self.boxsizers_jugador[-1])
-        self.Layout()
-    
-    #Añadir las cartas iniciales
-    def anyadir_cartas_iniciales(self, cartas, id):
-        static_bitmap = wx.StaticBitmap(self.sizer_paneles_jugador[-1], wx.ID_ANY, cartas[id])
-        self.items_jugador[-1].append(static_bitmap)
-        self.boxsizers_jugador[-1].Add(static_bitmap, 0, wx.ALL | wx.EXPAND, 5)
-        self.Layout()
-
-#Dialgo de Nueva Partida    
+#DIALOGO DE NUEVA PARTIDA    
 class NuevaPartida(wx.Dialog):
-    def __init__(self, *args, **kwds):
-
+    def __init__(self ,*args, **kwds):
         kwds["style"] = kwds.get("style", 0) | wx.DEFAULT_DIALOG_STYLE | wx.CENTRE
         wx.Dialog.__init__(self, *args, **kwds)
         self.SetTitle("dialog")
         self.Center()
 
         self.apuesta = 0
-        self.querer_jugar = True
+        self.querer_jugar = False
 
         sizer_dialogo = wx.BoxSizer(wx.VERTICAL)
         sizer_apuesta = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, "Apuesta"), wx.VERTICAL)
@@ -269,6 +281,7 @@ class NuevaPartida(wx.Dialog):
 
     #Queremos seguir jugando, por lo que guardamos el valor de la apuesta
     def seguir_jugando(self,event):
+        self.querer_jugar = True
         if self.apuesta_baja.GetValue():
             self.apuesta = tipo_apuesta[0]
         elif self.apuesta_media.GetValue():
@@ -280,7 +293,7 @@ class NuevaPartida(wx.Dialog):
     #No queremos que siga jugando, cerramos el juego
     def cerrar_juego(self,event):
         self.querer_jugar = False
-        self.GetParent().Close()
+        self.Close()
 
 #Ventana de BlackJack
 class BlackJackWindow(wx.Dialog):
@@ -310,14 +323,17 @@ class BlackJackWindow(wx.Dialog):
 
         self.Bind(wx.EVT_BUTTON, self.cerrar_ventana, self.boton_ok)
 
+    #Funcion para mostrar la ventana
     def mostrar_ventana(self):
         self.Center()
         self.Show()
         wx.CallLater(3000,self.cerrar_ventana_automatico)
 
+    # Funcion pra cerrar la ventana ( se llama solo desdela anterior)
     def cerrar_ventana_automatico(self):
         self.Close()
 
+    # Funcion de cerrar la ventnana mediante un EVT_BUTTON
     def cerrar_ventana(self,event):
         self.Close()
 
@@ -325,114 +341,16 @@ class BlackJackWindow(wx.Dialog):
     def cambiar_apuesta(self,apuesta):
         self.label_dinero_blackjack.SetLabel(f"{apuesta} €")
         self.Layout()
-    
+
+#CLASE BLACKJACK (Applicacion) 
 class BlackJack(wx.App):
     def OnInit(self):
         self.frame = Ventana(None, wx.ID_ANY, "")
         self.SetTopWindow(self.frame)
         self.frame.Show()
         return True
-
-#Definimos el main
-def main():
-    #Definimos la instancia del juego: la app, las imagenes, y la estrategia y el mazo como la anterior
-    app = BlackJack(0)
-    cartas = []
-    cartas = generar_cartas()
-    apuesta = 0             #Iniciamos la isntancia de la apuesta
-    estrategia = Estrategia(Mazo.NUM_BARAJAS)
-    mazo = Mazo(Carta, estrategia)
-
-    #Funciones para añadir una carta y generar las distintas manos
-    def anyadirCartas(mano,numero_cartas):
-        for i in range(len(mano)):
-            for _ in range(numero_cartas):
-                mano[i].append(mazo.reparte())
-        return mano
-
-    def createMano(mano,nombre,letter,centinela, apuesta):
-        h = []
-        for element in mano:
-            if len(mano)>1:
-                tmpName = nombre+str(chr(ord(letter) + centinela))
-                centinela+=1
-                h.append(Mano(element,tmpName,apuesta))
-            else:   
-                h.append(Mano(element,nombre,apuesta))
-        return h
     
-    # Funcion para comprobar si hay BlackJack o no
-    def comprobar_blackjack(mano_jugador, blackjack):
-            for mano in mano_jugador:
-                if mano.sumaCartas == valor_maximo_manos[0]:
-                    blackjack = True
-                    break
-            return blackjack
-
-    """ He tenido complicaciones a la hora de usar el bucle. Por lo que he creado una funcion
-    'Recursiva' que se vaya recorriendo segun las acciones (Los dialogos no esperaban el tiempo) """
-
-    def inicializacion_juego():
-        #Definimos una ventana de Nueva partida que sea 'hija' de la Ventana main
-        nueva_partida = NuevaPartida(app.frame, wx.ID_ANY, "")
-        nueva_partida.Center()
-        nueva_partida.ShowModal()
-        #Guardamos la apuesta
-        apuesta = nueva_partida.apuesta
-
-        #Comprobamos si realmente quiere jugar o no
-        if nueva_partida.querer_jugar == False:
-            return
-
-        #Se inicia una nueva partida (El usuario ha aceptado)
-        app.frame.anyadir_partida()
-        app.frame.eliminar_elementos()
-        #Genramos las manos iniciales del Croupier y del Jugador
-        nombre, letter = nombres[1], 'A'
-        centinela, cartas_por_mano = 0,1
-
-        croupier, mano_croupier = [[]],[]
-        croupier = anyadirCartas(croupier,cartas_por_mano)
-        mano_croupier = createMano(croupier,nombre,letter,centinela, apuesta)
-
-        nombre = nombres[0]
-        cartas_por_mano =  2
-        #Guardamos las cartas (Type Carta), las manos (Type Mano) y el formato carta para su impreson respectivamente
-        jugador, mano_jugador = [[]], []
-        jugador = anyadirCartas(jugador,cartas_por_mano)
-        mano_jugador = createMano(jugador,nombre,letter,centinela, apuesta)
-
-        #Ya tenemos creada las manos iniciales, ahora toca colocarlas en la interfaz
-        info_croupier = f"{mano_croupier[0].nombre}\n({mano_croupier[0].sumaCartas})\n{mano_croupier[0].estado}"
-        app.frame.anyadir_info_croupier(info_croupier)
-        app.frame.anyadir_carta_croupier(cartas, croupier[0][0].ind)
-        info_jugador = f"({mano_jugador[0].sumaCartas})\n{mano_jugador[0].apuesta} €\n{mano_jugador[0].estado}"
-        app.frame.nuevo_panel(info=info_jugador)
-        for i in range(2):
-            app.frame.anyadir_cartas_iniciales(cartas=cartas,id=jugador[0][i].ind)
-
-        #Comprobamos si hay BlackJack o no (Crear una BlackJackWindow)
-        blackjack = False
-        blackjack = comprobar_blackjack(mano_jugador, blackjack)
-
-        if blackjack == True:
-            #El juego ha acabado con BlackJack 
-            blackjack_window = BlackJackWindow(None, title="BlackJack")
-            apuesta_ganada = round(apuesta*(3/2))
-            blackjack_window.cambiar_apuesta(apuesta = apuesta_ganada)
-            app.frame.cambiar_balances(apuesta_ganada)
-            #CAMBIAR APUESTA DENRO DE APP.FRAME
-            blackjack_window.mostrar_ventana()
-            #Volvemos al juego
-            wx.CallLater(3000, inicializacion_juego) 
-
-        else:
-            #Crear otras cosas mias que te ire comentando
-            return
-
-    inicializacion_juego()
-    app.MainLoop()
-
-
+#Main
 if __name__ == "__main__":
-    main()
+    app = BlackJack(0)
+    app.MainLoop()
