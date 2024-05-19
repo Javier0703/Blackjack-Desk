@@ -105,6 +105,7 @@ class Ventana(wx.Frame):
         self.reduccion = 0.25
         self.cartas = generar_cartas(reduccion=self.reduccion)
         self.panel_seleccionado = 0
+        self.blackjack = False
 
         # Generamos la estrategia y el mazo como en la practica anterior
         self.estrategia = Estrategia(Mazo.NUM_BARAJAS)
@@ -121,6 +122,8 @@ class Ventana(wx.Frame):
         self.panel_activo = wx.Colour(255, 255, 204)
         self.panel_perdido = wx.Colour(255, 0, 0)
         self.panel_ganado =  wx.Colour(0, 128, 0)
+        self.panel_cerrado = wx.Colour(211, 211, 211)
+        self.panel_pasado = wx.Colour(105, 105, 105)
 
         #Sizer general de la ventana (Dos columnas)
         sizer_general = wx.BoxSizer(wx.HORIZONTAL)
@@ -215,6 +218,7 @@ class Ventana(wx.Frame):
 
         #Eventos de los botones
         self.Bind(wx.EVT_BUTTON, self.accion_pedir, self.boton_pedir)
+        self.Bind(wx.EVT_BUTTON, self.accion_cerrar, self.boton_cerrar)
         
         
         # Inicializamos el Juego
@@ -233,7 +237,6 @@ class Ventana(wx.Frame):
         except ValueError:
             pass      
         self.Layout()
-        print(self.retardo)
 
     #GLOBAL: Agregar una partida mas
     def agregar_partida(self):
@@ -243,6 +246,7 @@ class Ventana(wx.Frame):
 
     # INICIAL: Funcion para iniciar un nuevo juego
     def nuevo_juego(self):
+        self.blackjack = False
         wx.CallLater(10, self.init_game)
 
     #INICIAL :Creacion del juego -> Apertura de dialogo    
@@ -327,30 +331,24 @@ class Ventana(wx.Frame):
 
     # GLOBAL: Seleccionar panel
     def seleccionar_panel(self, event):
-        # Deshabilitamos el diable por si el panel anterior activado podia
-        self.boton_separar.Disable()
-        self.boton_pedir.Enable()
-        self.boton_cerrar.Enable()
-        self.boton_doblar.Enable()
-
-        # F
-        #Pintamos de color
+ 
+        # Comprobamos los paneles. Activar el seleccionado, desactivar el resto (activo)
         for panel in self.paneles_jugador:
             if panel == event.GetEventObject():
-                panel.SetBackgroundColour(self.panel_activo)
                 self.panel_seleccionado = panel.index
+                if (panel.mano_jugador.estado).upper() == "ACTIVA":
+                    self.boton_pedir.Enable()
+                    self.boton_cerrar.Enable()
+                    self.boton_doblar.Enable()
+                    panel.SetBackgroundColour(self.panel_activo)
+                    if panel.comprobar_separable() == True:
+                        self.boton_separar.Enable()
+                    else:
+                        self.boton_separar.Disable()
             else:
-                panel.SetBackgroundColour(wx.NullColour)
-            self.Refresh()
-
-        if self.paneles_jugador[self.panel_seleccionado].comprobar_separable() == True:
-            self.boton_separar.Enable()
-        else:
-            self.boton_separar.Disable()
-
-        # Comprobar si deben de tener los botones activos o no
-        if self.paneles_jugador[self.panel_seleccionado].mano_jugador.sumaCartas > 21:
-            self.deshabilitar_botones()    
+                if (panel.mano_jugador.estado).upper() == "ACTIVA":
+                    panel.SetBackgroundColour(wx.NullColour)
+            self.Refresh()   
 
     #GLOBAL: Funcion para deshabilitar botones
     def deshabilitar_botones(self):
@@ -363,35 +361,21 @@ class Ventana(wx.Frame):
     def comprobar_blackjack(self):
         for panel in self.paneles_jugador:
             if panel.mano_jugador.sumaCartas == max_value[1]:
+                self.blackjack = True
                 self.apuesta *= (3/2)
                 self.apuesta =  int(self.apuesta)
                 # Creamos La ventana de BlackJack
                 blackjack = BlackJackWindow(self)
                 blackjack.cambiar_apuesta(str(self.apuesta))
                 blackjack.mostrar_ventana()
-                self.cambiar_valores_apuesta()
+                self.cambiar_valores_apuesta_bj()
                 wx.CallLater(2000, self.nuevo_juego)
                   
     # FINAL: Funcion para cambiar los valores de la apuesta
-    def cambiar_valores_apuesta(self):
+    def cambiar_valores_apuesta_bj(self):
         self.balance = self.apuesta
         self.balance_global += self.apuesta
-        self.balance_partida.SetLabel(f"{self.balance} €")
-
-        if self.balance > 0:
-            self.balance_partida.SetForegroundColour(wx.Colour(0, 128, 0))
-        elif self.balance < 0:
-            self.balance_partida.SetForegroundColour(wx.Colour(255, 0, 0))
-        self.balance_partida.Refresh()
-
-        self.balance_total.SetLabel(f"{self.balance_global} €")
-
-        if self.balance_global > 0:
-            self.balance_total.SetForegroundColour(wx.Colour(0, 128, 0))
-        elif self.balance_global < 0:
-            self.balance_total.SetForegroundColour(wx.Colour(255, 0, 0))
-        self.balance_total.Refresh()
-        self.Layout()
+        self.modificar_paneles_balance()
 
     # INICIAL: Poner a 0 el balance de la partida
     def vaciar_balance_partida(self):
@@ -410,13 +394,115 @@ class Ventana(wx.Frame):
         self.Layout()
         self.Refresh()
         self.comprobar_panel_accionado()
-        # COMPROBACION DE TODAS LAS MANOS
+        # Comprobamos las manos para colorearlas
+        self.comprobacion_manos()
 
+    # GLOBAL: Funcion para cerrar una apuesta
+    def accion_cerrar(self,event):
+        self.paneles_jugador[self.panel_seleccionado].mano_jugador.estado = 'Cerrada'
+        self.paneles_jugador[self.panel_seleccionado].actualizar_info_panel()
+        self.Layout()
+        self.Refresh()
+        self.comprobar_panel_accionado()
+        self.comprobacion_manos()
 
-    # GLOBAL: Funcion que al seleccionar una accion para comprobar si es posible seguir accionando
+    # GLOBAL: Funcion llamada por una accion para comprobar si es posible seguir accionando
     def comprobar_panel_accionado(self):
         if self.paneles_jugador[self.panel_seleccionado].mano_jugador.sumaCartas > 21:
             self.deshabilitar_botones()
+
+    def comprobacion_manos(self):
+        self.manos_activas = 0
+        self.manos_pasadas = 0
+        for panel in self.paneles_jugador:
+            if panel.mano_jugador.estado.upper() == 'PASADA':
+                panel.SetBackgroundColour(self.panel_pasado)
+                self.manos_pasadas +=1
+            elif panel.mano_jugador.estado.upper() == 'CERRADA':
+                panel.SetBackgroundColour(self.panel_cerrado)
+            else:
+                self.manos_activas +=1
+            # Coloreamos el panel de amarillo si es el activado
+            if panel.index == self.panel_seleccionado and panel.mano_jugador.estado.upper() == 'ACTIVA':
+                panel.SetBackgroundColour(self.panel_activo)
+
+        #Si no quedan manos activas, se finaliza el juego. --> Conteo resultados
+        # Si todas las manos son pasadas, al conteo, si no, añadimos al croupier
+        if(self.manos_activas == 0):
+            if self.manos_pasadas == len(self.paneles_jugador):
+                self.conteo_final()
+            else:
+                self.anyadir_cartas_croupier()
+
+    # FINAL: Añadir Cartas al Croupier hasta 17
+    def anyadir_cartas_croupier(self):
+        suma_mano = self.mano_croupier.sumaCartas
+        # Miestras sea menor de 17, se genera una carta
+        while suma_mano<max_value[0]:
+            carta = self.mazo.reparte()
+            self.mano_croupier.addCarta(carta)
+            self.mano_croupier.actualizarDatosMano() 
+            self.modificar_info_croupier()
+            self.anyadir_carta_panel(indice=carta.ind)
+            suma_mano = self.mano_croupier.sumaCartas
+
+        self.conteo_final()
+
+    # FINAL: Conteo de resultados
+    def conteo_final(self):
+        suma_croup = self.mano_croupier.sumaCartas
+
+        for panel in self.paneles_jugador:
+            suma_jug = panel.mano_jugador.sumaCartas
+            apuesta = panel.mano_jugador.apuesta
+
+            if (suma_croup > max_value[1] and suma_jug > max_value[1]) or (suma_croup == suma_jug):
+                self.balance += 0
+                self.balance_global += 0
+
+            elif suma_croup > max_value[1]:  # Se pasa el Croupier
+                self.balance += apuesta
+                self.balance_global += apuesta
+                panel.SetBackgroundColour(self.panel_ganado)
+
+            elif suma_jug > max_value[1]:  # Se pasa el Jugador
+                self.balance -= apuesta
+                self.balance_global -= apuesta
+                panel.SetBackgroundColour(self.panel_perdido)
+
+            elif suma_croup > suma_jug:  # El Croupier gana
+                self.balance -= apuesta
+                self.balance_global -= apuesta
+                panel.SetBackgroundColour(self.panel_perdido)
+
+            else:  # El Jugador gana
+                self.balance += apuesta
+                self.balance_global += apuesta
+                panel.SetBackgroundColour(self.panel_ganado)
+
+            self.Layout()
+            self.Refresh()
+
+        self.modificar_paneles_balance()
+
+    #FINAL: Modificar Paneles --> Luego nuevo juego
+    def modificar_paneles_balance(self): 
+        self.balance_partida.SetLabel(f"{self.balance} €")
+        if self.balance > 0:
+            self.balance_partida.SetForegroundColour(wx.Colour(0, 128, 0))
+        elif self.balance < 0:
+            self.balance_partida.SetForegroundColour(wx.Colour(255, 0, 0))
+        self.balance_partida.Refresh()
+        self.balance_total.SetLabel(f"{self.balance_global} €")
+        if self.balance_global > 0:
+            self.balance_total.SetForegroundColour(wx.Colour(0, 128, 0))
+        elif self.balance_global < 0:
+            self.balance_total.SetForegroundColour(wx.Colour(255, 0, 0))
+        self.balance_total.Refresh()
+        self.Layout()
+
+        if self.blackjack == False:
+            self.nuevo_juego()
 
 #DIALOGO DE NUEVA PARTIDA    
 class NuevaPartida(wx.Dialog):
