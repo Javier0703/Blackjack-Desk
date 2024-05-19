@@ -25,7 +25,6 @@ class Carta(CartaBase):
       #Lista con los detalles de la carta [Valor, Indice, Palo]
       return [self.valor,num,palo]
    
-
 class Mano():
    def __init__(self,datos,nombre,apuesta):
       #Datos necesarios de la mano: Cartas para el manejo de ellas

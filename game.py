@@ -6,6 +6,7 @@ from ClasesFunciones import *
 
 #Creacion de Funciones/Clases
 tipo_apuesta = [2,10,50]
+max_value = [17,21]
 
 #Funcion para generar las cartas (Bitmap)
 def generar_cartas(reduccion):
@@ -45,6 +46,13 @@ class PanelJugador(wx.Panel):
 
         self.SetSizer(self.sizer)
         self.Layout()
+
+    # Funcion que indica si es comparable o no
+    def comprobar_separable(self):
+        if len(self.mano_jugador.valorCartas) == 2 and (self.mano_jugador.valorCartas[0][0] == self.mano_jugador.valorCartas[1][0]):
+            return True
+        else:
+            return False
 
 #CLASE VENTANA (Donde se encuentra la interfaz)
 class Ventana(wx.Frame):
@@ -215,14 +223,16 @@ class Ventana(wx.Frame):
 
         else:
             self.apuesta = nueva_ventana.apuesta
+            self.vaciar_balance_partida()
+            self.eliminar_elementos()
             self.agregar_partida()
             self.generar_manos()
+            self.deshabilitar_botones()
 
     # INICIAL: Generar las diversas manos
     def generar_manos(self):
-        self.eliminar_elementos()
-        wx.CallLater(100, self.anyadir_croupier)
-        wx.CallLater(200, self.anyadir_primer_panel)
+        wx.CallLater(self.tiempo_retardo, self.anyadir_croupier)
+        wx.CallLater(self.tiempo_retardo*2, self.anyadir_primer_panel)
     
     # GLOBAL: Funcion para eliminar los elementos
     def eliminar_elementos(self):
@@ -278,10 +288,13 @@ class Ventana(wx.Frame):
         self.paneles_jugador.append(self.nuevo_panel)
         self.sizer_manos_generales.Add(self.nuevo_panel, 0, wx.EXPAND, 0 )
         self.Layout()
-        #self.comporbar_blackjack()
+        # HACER
+        wx.CallLater(self.tiempo_retardo, self.comprobar_blackjack)
 
     # GLOBAL: Seleccionar panel
     def seleccionar_panel(self, event):
+        # Deshabilitamos el diable por si el panel anterior activado podia
+        self.boton_separar.Disable()
         self.boton_pedir.Enable()
         self.boton_cerrar.Enable()
         self.boton_doblar.Enable()
@@ -290,11 +303,61 @@ class Ventana(wx.Frame):
             if panel == event.GetEventObject():
                 panel.SetBackgroundColour(self.panel_activo)
                 self.panel_seleccionado = panel.index
-                print(self.panel_seleccionado)
             else:
                 panel.SetBackgroundColour(wx.NullColour)
             self.Refresh()
-        
+        if self.paneles_jugador[self.panel_seleccionado].comprobar_separable() == True:
+            self.boton_separar.Enable()
+        else:
+            self.boton_separar.Disable()
+
+    #GLOBAL: Funcion para deshabilitar botones
+    def deshabilitar_botones(self):
+        self.boton_separar.Disable()
+        self.boton_pedir.Disable()
+        self.boton_cerrar.Disable()
+        self.boton_doblar.Disable()
+
+    # INICIAL: Comprobamos el BlackJack
+    def comprobar_blackjack(self):
+        for panel in self.paneles_jugador:
+            if panel.mano_jugador.sumaCartas == max_value[1]:
+                self.apuesta *= (3/2)
+                self.apuesta =  int(self.apuesta)
+                # Creamos La ventana de BlackJack
+                blackjack = BlackJackWindow(self)
+                blackjack.cambiar_apuesta(str(self.apuesta))
+                blackjack.mostrar_ventana()
+                self.cambiar_valores_apuesta()
+                wx.CallLater(2000, self.nuevo_juego)
+                  
+    # FINAL: Funcion para cambiar los valores de la apuesta
+    def cambiar_valores_apuesta(self):
+        self.balance = self.apuesta
+        self.balance_global += self.apuesta
+        self.balance_partida.SetLabel(f"{self.balance} €")
+
+        if self.balance > 0:
+            self.balance_partida.SetForegroundColour(wx.Colour(0, 128, 0))
+        elif self.balance < 0:
+            self.balance_partida.SetForegroundColour(wx.Colour(255, 0, 0))
+        self.balance_partida.Refresh()
+
+        self.balance_total.SetLabel(f"{self.balance_global} €")
+
+        if self.balance_global > 0:
+            self.balance_total.SetForegroundColour(wx.Colour(0, 128, 0))
+        elif self.balance_global < 0:
+            self.balance_total.SetForegroundColour(wx.Colour(255, 0, 0))
+        self.balance_total.Refresh()
+        self.Layout()
+
+    def vaciar_balance_partida(self):
+        self.balance = 0
+        self.balance_partida.SetLabel(f"{self.balance} €")
+        self.balance_partida.SetForegroundColour(wx.Colour(0, 0, 0))
+        self.Layout()
+
 #DIALOGO DE NUEVA PARTIDA    
 class NuevaPartida(wx.Dialog):
     def __init__(self ,*args, **kwds):
@@ -356,7 +419,7 @@ class BlackJackWindow(wx.Dialog):
         kwds["style"] = kwds.get("style", 0) | wx.DEFAULT_DIALOG_STYLE
         wx.Dialog.__init__(self, *args, **kwds)
         self.SetTitle("BlackJack")
-
+        self.apuesta = 0
         sizer_dialogo_blackjack = wx.BoxSizer(wx.VERTICAL)
         imagen = wx.Image(f"Imagenes//blackjack.jpg", wx.BITMAP_TYPE_ANY)
         imagen_blackjack = wx.StaticBitmap(self, wx.ID_ANY, wx.Bitmap(imagen))
@@ -366,7 +429,7 @@ class BlackJackWindow(wx.Dialog):
         label_haganado = wx.StaticText(self, wx.ID_ANY, "Ganado:")
         label_haganado.SetFont(wx.Font(16, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, 0, "Segoe UI"))
         sizer_info_blackjack.Add(label_haganado, 0, wx.LEFT, 5)
-        self.label_dinero_blackjack = wx.StaticText(self, wx.ID_ANY, f"0 €")
+        self.label_dinero_blackjack = wx.StaticText(self, wx.ID_ANY, f"{self.apuesta} €")
         self.label_dinero_blackjack.SetFont(wx.Font(16, wx.FONTFAMILY_SWISS, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, 0, "Segoe UI"))
         sizer_info_blackjack.Add(self.label_dinero_blackjack, 0, wx.LEFT | wx.RIGHT, 15)
         self.boton_ok = wx.Button(self, wx.ID_ANY, "OK")
@@ -377,11 +440,16 @@ class BlackJackWindow(wx.Dialog):
 
         self.Bind(wx.EVT_BUTTON, self.cerrar_ventana, self.boton_ok)
 
+    #Funcion para cambiar el valor del label
+    def cambiar_apuesta(self, apuesta_ganada):
+        self.label_dinero_blackjack.SetLabel(f"{apuesta_ganada} €")
+        self.Layout()
+
     #Funcion para mostrar la ventana
     def mostrar_ventana(self):
         self.Center()
         self.Show()
-        wx.CallLater(3000,self.cerrar_ventana_automatico)
+        wx.CallLater(2000,self.cerrar_ventana_automatico)
 
     # Funcion pra cerrar la ventana ( se llama solo desdela anterior)
     def cerrar_ventana_automatico(self):
@@ -390,11 +458,6 @@ class BlackJackWindow(wx.Dialog):
     # Funcion de cerrar la ventnana mediante un EVT_BUTTON
     def cerrar_ventana(self,event):
         self.Close()
-
-    # Mostrar la apuesta ganada
-    def cambiar_apuesta(self,apuesta):
-        self.label_dinero_blackjack.SetLabel(f"{apuesta} €")
-        self.Layout()
 
 #CLASE BLACKJACK (Applicacion) 
 class BlackJack(wx.App):
