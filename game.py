@@ -2,6 +2,8 @@
 """Practica creada por Javier Calvo Porro, estudiante de Ingenieria Informatica, UVa"""
 
 import wx
+import wx.adv
+import time
 from ClasesFunciones import *
 
 #Creacion de Funciones/Clases
@@ -63,6 +65,7 @@ class PanelJugador(wx.Panel):
         self.mano_jugador.apuesta *= 2
         self.pedir_separar()
         self.mano_jugador.doblarApuesta()
+        self.actualizar_info_panel()
         
     # Funcion par aactualizar el panel
     def actualizar_info_panel(self):
@@ -232,6 +235,7 @@ class Ventana(wx.Frame):
     # GLOBAL: Se cambia el modo
     def cambiar_modo (self,event):
         self.modo_juego = 'M' if self.modo_juego == 'A' else 'A'
+        self.accion_automatica()
 
     #GLOBAL: Actualizar el retardo cada vez que hay cambios (sin necesidad de enter)
     def actualizar_retardo(self,event):
@@ -256,21 +260,21 @@ class Ventana(wx.Frame):
 
     #INICIAL :Creacion del juego -> Apertura de dialogo    
     def init_game(self):
-        #Seleccion de la Apuesta
-        nueva_ventana = NuevaPartida(self)
-        nueva_ventana.Center()
-        nueva_ventana.ShowModal()
 
-        if nueva_ventana.querer_jugar == False:
-            self.Close()
-
-        else:
+        if self.modo_juego == 'M':
+            nueva_ventana = NuevaPartida(self)
+            nueva_ventana.Center()
+            nueva_ventana.ShowModal()
             self.apuesta = nueva_ventana.apuesta
-            self.vaciar_balance_partida()
-            self.eliminar_elementos()
-            self.agregar_partida()
-            self.generar_manos()
-            self.deshabilitar_botones()
+            if nueva_ventana.querer_jugar == False:
+                self.Close()
+        else:
+            self.apuesta = self.estrategia.apuesta(tipo_apuesta[0],tipo_apuesta[1],tipo_apuesta[2])
+        self.vaciar_balance_partida()
+        self.eliminar_elementos()
+        self.agregar_partida()
+        self.generar_manos()
+        self.deshabilitar_botones()
 
     # INICIAL: Generar las diversas manos
     def generar_manos(self):
@@ -331,7 +335,6 @@ class Ventana(wx.Frame):
         self.paneles_jugador.append(self.nuevo_panel)
         self.sizer_manos_generales.Add(self.nuevo_panel, 0, wx.EXPAND, 0 )
         self.Layout()
-        # HACER
         wx.CallLater(self.tiempo_retardo, self.comprobar_blackjack)
 
     # GLOBAL: Seleccionar panel
@@ -371,10 +374,14 @@ class Ventana(wx.Frame):
                 self.apuesta =  int(self.apuesta)
                 # Creamos La ventana de BlackJack
                 blackjack = BlackJackWindow(self)
+                blackjack.sonido()
                 blackjack.cambiar_apuesta(str(self.apuesta))
                 blackjack.mostrar_ventana()
                 self.cambiar_valores_apuesta_bj()
                 wx.CallLater(2000, self.nuevo_juego)
+
+        if self.modo_juego =='A':  
+            self.accion_automatica()  
                   
     # FINAL: Funcion para cambiar los valores de la apuesta
     def cambiar_valores_apuesta_bj(self):
@@ -477,13 +484,13 @@ class Ventana(wx.Frame):
         suma_mano = self.mano_croupier.sumaCartas
         # Miestras sea menor de 17, se genera una carta
         while suma_mano<max_value[0]:
+            #time.sleep(self.tiempo_retardo)
             carta = self.mazo.reparte()
             self.mano_croupier.addCarta(carta)
             self.mano_croupier.actualizarDatosMano() 
             self.modificar_info_croupier()
             self.anyadir_carta_panel(indice=carta.ind)
             suma_mano = self.mano_croupier.sumaCartas
-
         self.conteo_final()
 
     # FINAL: Conteo de resultados
@@ -541,6 +548,38 @@ class Ventana(wx.Frame):
 
         if self.blackjack == False:
             self.nuevo_juego()
+
+    #MODO AUTOMATICO
+    def accion_automatica(self):
+        if self.modo_juego == 'A':
+            self.manos_activas_autom = self.comprobar_manos_activas()
+            while self.manos_activas_autom>0:
+                for panel in self.paneles_jugador:
+                    if panel.mano_jugador.estado.upper() == 'ACTIVA':
+                        #Metodo automatico de cartas" Una carta del croupir y la lista de las del jugador
+                        croupier_card = self.cartas_croupier[0]
+                        jugador_cards = panel.cartas_jugador
+                        self.accion = self.estrategia.jugada(croupier_card, jugador_cards)
+                        self.panel_seleccionado = panel.index
+                        #Segun la accion que sea, hace unas cosas o otras. Devielve una de estas [P-C-D-S]
+                        #APLICAR AQUI EL TIMER (LOS MS ESTAN EN self.tiempo_retardo)
+                        if self.accion == 'P':
+                            self.accion_pedir(event=None)
+                        if self.accion == 'C':
+                            self.accion_cerrar(event=None)
+                        if self.accion == 'D':
+                            self.accion_doblar(event=None)
+                        if self.accion == 'S':
+                            self.accion_separar(event=None)
+                self.manos_activas_autom = self.comprobar_manos_activas() 
+
+    # Funcion llamada automaticamente para comprobar las manos activas
+    def comprobar_manos_activas(self):
+        cont = 0
+        for panel in self.paneles_jugador:
+            if panel.mano_jugador.estado.upper() == 'ACTIVA':
+                cont += 1
+        return cont
 
 #DIALOGO DE NUEVA PARTIDA    
 class NuevaPartida(wx.Dialog):
@@ -623,6 +662,12 @@ class BlackJackWindow(wx.Dialog):
         self.Layout()
 
         self.Bind(wx.EVT_BUTTON, self.cerrar_ventana, self.boton_ok)
+
+    def sonido(self):
+        sound = "Sonidos//bj_win.mp3"  # Ruta al archivo de sonido
+        sound = wx.adv.Sound(sound)
+        if sound.IsOk():
+            sound.Play(wx.adv.SOUND_ASYNC)
 
     #Funcion para cambiar el valor del label
     def cambiar_apuesta(self, apuesta_ganada):
