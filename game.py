@@ -25,8 +25,8 @@ class PanelJugador(wx.Panel):
  
         self.index = index
         self.cartas_jugador = cartas_jugador
-        self.mano_jugador = mano_jugador
-        self.lista_cartas = []        
+        self.mano_jugador = mano_jugador  
+        self.cartas = cartas     
 
         # Creamos la estructura
         self.sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -40,8 +40,7 @@ class PanelJugador(wx.Panel):
 
         # Bucle para añadir las imágenes
         for carta in cartas_jugador:
-            static_bitmap = wx.StaticBitmap(self, wx.ID_ANY, cartas[carta.ind])
-            self.lista_cartas.append(static_bitmap)
+            static_bitmap = wx.StaticBitmap(self, wx.ID_ANY, self.cartas[carta.ind])
             self.sizer.Add(static_bitmap, 0, wx.ALL | wx.EXPAND, 5)
 
         self.SetSizer(self.sizer)
@@ -53,6 +52,36 @@ class PanelJugador(wx.Panel):
             return True
         else:
             return False
+
+    # Funcion ejecutada por ventana por pedir    
+    def pedir(self):
+        self.mano_jugador.datos == self.cartas_jugador
+        self.mano_jugador.actualizarDatosMano()
+        self.actualizar_info_panel()
+
+
+    # Funcion par aactualizar el panel
+    def actualizar_info_panel(self):
+
+        # Eliminar todos los widgets hijos del panel
+        self.sizer.Clear(delete_windows=True)
+
+        # Actualizar la información del jugador
+        self.informacion = f"({self.mano_jugador.sumaCartas})\n{self.mano_jugador.apuesta} €\n{self.mano_jugador.estado}"
+
+        # Crear nuevos widgets
+        self.info = wx.StaticText(self, wx.ID_ANY, self.informacion, style=wx.ALIGN_CENTER_HORIZONTAL)
+        self.info.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
+        self.info.SetMinSize((150, 100))
+        self.sizer.Add(self.info, 0, wx.ALL | wx.EXPAND, 5)
+
+        for carta in self.cartas_jugador:
+            static_bitmap = wx.StaticBitmap(self, wx.ID_ANY, self.cartas[carta.ind])
+            self.sizer.Add(static_bitmap, 0, wx.ALL | wx.EXPAND, 5)
+
+        # Refrescar el layout del panel
+        self.Refresh()
+        self.Layout() 
 
 #CLASE VENTANA (Donde se encuentra la interfaz)
 class Ventana(wx.Frame):
@@ -183,7 +212,12 @@ class Ventana(wx.Frame):
         self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_modo, self.boton_manual)
         self.Bind(wx.EVT_RADIOBUTTON, self.cambiar_modo, self.boton_automatico)
         self.Bind(wx.EVT_TEXT, self.actualizar_retardo, self.retardo)
+
+        #Eventos de los botones
+        self.Bind(wx.EVT_BUTTON, self.accion_pedir, self.boton_pedir)
         
+        
+        # Inicializamos el Juego
         self.nuevo_juego()
      
     # GLOBAL: Se cambia el modo
@@ -298,6 +332,8 @@ class Ventana(wx.Frame):
         self.boton_pedir.Enable()
         self.boton_cerrar.Enable()
         self.boton_doblar.Enable()
+
+        # F
         #Pintamos de color
         for panel in self.paneles_jugador:
             if panel == event.GetEventObject():
@@ -306,10 +342,15 @@ class Ventana(wx.Frame):
             else:
                 panel.SetBackgroundColour(wx.NullColour)
             self.Refresh()
+
         if self.paneles_jugador[self.panel_seleccionado].comprobar_separable() == True:
             self.boton_separar.Enable()
         else:
             self.boton_separar.Disable()
+
+        # Comprobar si deben de tener los botones activos o no
+        if self.paneles_jugador[self.panel_seleccionado].mano_jugador.sumaCartas > 21:
+            self.deshabilitar_botones()    
 
     #GLOBAL: Funcion para deshabilitar botones
     def deshabilitar_botones(self):
@@ -352,11 +393,30 @@ class Ventana(wx.Frame):
         self.balance_total.Refresh()
         self.Layout()
 
+    # INICIAL: Poner a 0 el balance de la partida
     def vaciar_balance_partida(self):
         self.balance = 0
         self.balance_partida.SetLabel(f"{self.balance} €")
         self.balance_partida.SetForegroundColour(wx.Colour(0, 0, 0))
         self.Layout()
+
+    # GLOBAL-ACCIONES: ACCIONES BOTONES
+
+    # GLOBAL: Funcion para añadir una carta
+    def accion_pedir(self,event):
+        self.paneles_jugador[self.panel_seleccionado].cartas_jugador.append(self.mazo.reparte())
+        # Cambiar los valores dentro del objeto
+        self.paneles_jugador[self.panel_seleccionado].pedir()
+        self.Layout()
+        self.Refresh()
+        self.comprobar_panel_accionado()
+        # COMPROBACION DE TODAS LAS MANOS
+
+
+    # GLOBAL: Funcion que al seleccionar una accion para comprobar si es posible seguir accionando
+    def comprobar_panel_accionado(self):
+        if self.paneles_jugador[self.panel_seleccionado].mano_jugador.sumaCartas > 21:
+            self.deshabilitar_botones()
 
 #DIALOGO DE NUEVA PARTIDA    
 class NuevaPartida(wx.Dialog):
