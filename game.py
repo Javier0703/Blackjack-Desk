@@ -54,12 +54,16 @@ class PanelJugador(wx.Panel):
             return False
 
     # Funcion ejecutada por ventana por pedir    
-    def pedir(self):
+    def pedir_separar(self):
         self.mano_jugador.datos == self.cartas_jugador
         self.mano_jugador.actualizarDatosMano()
         self.actualizar_info_panel()
 
-
+    def doblar(self):
+        self.mano_jugador.apuesta *= 2
+        self.pedir_separar()
+        self.mano_jugador.doblarApuesta()
+        
     # Funcion par aactualizar el panel
     def actualizar_info_panel(self):
 
@@ -219,7 +223,8 @@ class Ventana(wx.Frame):
         #Eventos de los botones
         self.Bind(wx.EVT_BUTTON, self.accion_pedir, self.boton_pedir)
         self.Bind(wx.EVT_BUTTON, self.accion_cerrar, self.boton_cerrar)
-        
+        self.Bind(wx.EVT_BUTTON, self.accion_doblar, self.boton_doblar)
+        self.Bind(wx.EVT_BUTTON, self.accion_separar, self.boton_separar)
         
         # Inicializamos el Juego
         self.nuevo_juego()
@@ -388,19 +393,45 @@ class Ventana(wx.Frame):
 
     # GLOBAL: Funcion para añadir una carta
     def accion_pedir(self,event):
-        self.paneles_jugador[self.panel_seleccionado].cartas_jugador.append(self.mazo.reparte())
-        # Cambiar los valores dentro del objeto
-        self.paneles_jugador[self.panel_seleccionado].pedir()
-        self.Layout()
-        self.Refresh()
-        self.comprobar_panel_accionado()
-        # Comprobamos las manos para colorearlas
-        self.comprobacion_manos()
+        panel = self.paneles_jugador[self.panel_seleccionado]
+        panel.cartas_jugador.append(self.mazo.reparte())
+        panel.pedir_separar()
+        self.reset_content()
 
     # GLOBAL: Funcion para cerrar una apuesta
     def accion_cerrar(self,event):
-        self.paneles_jugador[self.panel_seleccionado].mano_jugador.estado = 'Cerrada'
-        self.paneles_jugador[self.panel_seleccionado].actualizar_info_panel()
+        panel = self.paneles_jugador[self.panel_seleccionado]
+        panel.mano_jugador.estado = 'Cerrada'
+        panel.actualizar_info_panel()
+        self.reset_content()
+
+    # GLOBAL: Funcion para dolbar una apuesta
+    def accion_doblar(self,event):
+        panel = self.paneles_jugador[self.panel_seleccionado]
+        panel.cartas_jugador.append(self.mazo.reparte())
+        panel.doblar()
+        self.reset_content()
+    
+    # GLOBAL: Funcion para separar las cartas de la baraja
+    def accion_separar(self,event):
+        panel = self.paneles_jugador[self.panel_seleccionado]
+        apuesta_panel = panel.mano_jugador.apuesta
+        carta_extraida = []
+        carta_extraida.append(panel.cartas_jugador.pop())
+        #Actualizamos el panel
+        panel.pedir_separar()
+
+        # Hay que crear un nuevo panel y meterlo
+        mano = Mano(carta_extraida,'Jugador',apuesta_panel)
+        self.nuevo_panel = PanelJugador(parent=self.panel_dinamico, id=wx.ID_ANY, index= len(self.paneles_jugador), cartas_jugador=carta_extraida, mano_jugador=mano, cartas= self.cartas)
+        self.nuevo_panel.Bind(wx.EVT_LEFT_DOWN, self.seleccionar_panel)
+        self.paneles_jugador.append(self.nuevo_panel)
+        self.sizer_manos_generales.Add(self.nuevo_panel, 0, wx.EXPAND, 0 )
+        self.Layout()
+        self.reset_content()
+
+    # Reseteo de contenido al accionar botones
+    def reset_content(self):
         self.Layout()
         self.Refresh()
         self.comprobar_panel_accionado()
@@ -408,8 +439,15 @@ class Ventana(wx.Frame):
 
     # GLOBAL: Funcion llamada por una accion para comprobar si es posible seguir accionando
     def comprobar_panel_accionado(self):
-        if self.paneles_jugador[self.panel_seleccionado].mano_jugador.sumaCartas > 21:
+        panel = self.paneles_jugador[self.panel_seleccionado]
+        if panel.mano_jugador.sumaCartas > 21 or panel.mano_jugador.estado.upper() == 'CERRADA':
             self.deshabilitar_botones()
+
+        elif panel.comprobar_separable() == True:
+            self.boton_separar.Enable()
+        
+        elif panel.comprobar_separable() == False:
+            self.boton_separar.Disable()
 
     def comprobacion_manos(self):
         self.manos_activas = 0

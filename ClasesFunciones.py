@@ -1,5 +1,6 @@
 """Práctica creada por Javier Calvo Porro Estudiante de PAR, 1º Ingeniería Informática, UVa, 2023,24
 Creacion del Juego subida a GitHub: https://github.com/Javier0703/Blackjack-Desk"""
+
 from externo import CartaBase, Estrategia, Mazo
 
 #Creacion de clases/funciones/Variables para el programa
